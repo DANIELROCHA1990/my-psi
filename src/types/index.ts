@@ -46,6 +46,12 @@ export interface Patient {
   updated_at?: string
 }
 
+export interface SessionSchedule {
+  dayOfWeek: number // 0 = domingo, 1 = segunda, etc.
+  time: string // formato HH:mm
+  paymentStatus: 'paid' | 'pending'
+}
+
 export interface Session {
   id: string
   patient_id: string

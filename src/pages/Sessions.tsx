@@ -304,6 +304,10 @@ function SessionModal({
   onClose: () => void
   onSave: () => void
 }) {
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
+    session ? patients.find(p => p.id === session.patient_id) || null : null
+  )
+  
   const [formData, setFormData] = useState({
     patient_id: session?.patient_id || '',
     session_date: session?.session_date ? format(new Date(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
@@ -314,11 +318,22 @@ function SessionModal({
     mood_after: session?.mood_after || '',
     homework_assigned: session?.homework_assigned || '',
     next_session_date: session?.next_session_date ? format(new Date(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
-    session_price: session?.session_price?.toString() || '',
+    session_price: session?.session_price?.toString() || selectedPatient?.session_price?.toString() || '',
     payment_status: session?.payment_status || 'pending',
     summary: session?.summary || ''
   })
   const [loading, setLoading] = useState(false)
+  
+  // Atualizar preço quando paciente for selecionado
+  const handlePatientChange = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId)
+    setSelectedPatient(patient || null)
+    setFormData(prev => ({
+      ...prev,
+      patient_id: patientId,
+      session_price: patient?.session_price?.toString() || ''
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -383,13 +398,13 @@ function SessionModal({
                 <select
                   required
                   value={formData.patient_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, patient_id: e.target.value }))}
+                  onChange={(e) => handlePatientChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Selecione um paciente</option>
                   {patients.filter(p => p.active).map(patient => (
                     <option key={patient.id} value={patient.id}>
-                      {patient.full_name}
+                      {patient.full_name} {patient.session_price && `(R$ ${patient.session_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`}
                     </option>
                   ))}
                 </select>
@@ -440,7 +455,7 @@ function SessionModal({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valor da Sessão (R$)
+                  Valor da Sessão (R$) {selectedPatient && '(Valor fixo do paciente)'}
                 </label>
                 <input
                   type="number"
@@ -449,6 +464,7 @@ function SessionModal({
                   value={formData.session_price}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_price: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={selectedPatient ? `Valor padrão: R$ ${selectedPatient.session_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}` : 'Digite o valor'}
                 />
               </div>
               

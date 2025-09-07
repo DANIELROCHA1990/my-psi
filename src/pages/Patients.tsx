@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { patientService } from '../services/patientService'
+import { sessionService } from '../services/sessionService'
 import { Patient } from '../types'
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, MapPin, Calendar, Activity } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, MapPin, Calendar, Activity, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -286,7 +287,43 @@ function PatientModal({
     session_price: patient?.session_price?.toString() || '',
     active: patient?.active ?? true
   })
+  
+  const [sessionSchedules, setSessionSchedules] = useState<Array<{
+    dayOfWeek: number,
+    time: string,
+    paymentStatus: 'paid' | 'pending'
+  }>>([])
+  
+  const [createSessions, setCreateSessions] = useState(!patient) // Só para novos pacientes
   const [loading, setLoading] = useState(false)
+  
+  const daysOfWeek = [
+    { value: 1, label: 'Segunda-feira' },
+    { value: 2, label: 'Terça-feira' },
+    { value: 3, label: 'Quarta-feira' },
+    { value: 4, label: 'Quinta-feira' },
+    { value: 5, label: 'Sexta-feira' },
+    { value: 6, label: 'Sábado' },
+    { value: 0, label: 'Domingo' }
+  ]
+  
+  const addSchedule = () => {
+    setSessionSchedules([...sessionSchedules, {
+      dayOfWeek: 1,
+      time: '09:00',
+      paymentStatus: 'pending'
+    }])
+  }
+  
+  const removeSchedule = (index: number) => {
+    setSessionSchedules(sessionSchedules.filter((_, i) => i !== index))
+  }
+  
+  const updateSchedule = (index: number, field: string, value: any) => {
+    const updated = [...sessionSchedules]
+    updated[index] = { ...updated[index], [field]: value }
+    setSessionSchedules(updated)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -324,7 +361,22 @@ function PatientModal({
       } else {
         const { error } = await patientService.createPatient(patientData as any)
         if (error) throw error
-        toast.success('Paciente criado com sucesso')
+        
+        // Se deve criar sessões automaticamente
+        if (createSessions && sessionSchedules.length > 0) {
+          try {
+            await sessionService.createMultipleSessions(
+              error ? '' : 'new-patient-id', // Precisamos do ID do paciente criado
+              sessionSchedules,
+              12 // Criar sessões para 12 semanas
+            )
+            toast.success('Paciente e sessões criados com sucesso')
+          } catch (sessionError) {
+            toast.error('Paciente criado, mas erro ao criar sessões')
+          }
+        } else {
+          toast.success('Paciente criado com sucesso')
+        }
       }
 
       onSave()
@@ -581,19 +633,113 @@ function PatientModal({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valor da Sessão (R$)
+                  Valor Fixo da Sessão (R$) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
+                  required
                   value={formData.session_price}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_price: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Valor que será usado em todas as sessões"
                 />
               </div>
             </div>
           </div>
+          
+          {/* Automatic Session Creation - Only for new patients */}
+          {!patient && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Criação Automática de Sessões</h3>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createSessions}
+                    onChange={(e) => setCreateSessions(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              {createSessions && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Configure os dias e horários das sessões. Serão criadas automaticamente sessões para as próximas 12 semanas.
+                  </p>
+                  
+                  {sessionSchedules.map((schedule, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Dia da Semana
+                        </label>
+                        <select
+                          value={schedule.dayOfWeek}
+                          onChange={(e) => updateSchedule(index, 'dayOfWeek', Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {daysOfWeek.map(day => (
+                            <option key={day.value} value={day.value}>
+                              {day.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Horário
+                        </label>
+                        <input
+                          type="time"
+                          value={schedule.time}
+                          onChange={(e) => updateSchedule(index, 'time', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Status de Pagamento
+                        </label>
+                        <select
+                          value={schedule.paymentStatus}
+                          onChange={(e) => updateSchedule(index, 'paymentStatus', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="pending">Pendente</option>
+                          <option value="paid">Pago</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => removeSchedule(index)}
+                          className="w-full px-3 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Clock className="h-4 w-4" />
+                    Adicionar Horário de Sessão
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
             <button
