@@ -209,7 +209,7 @@ export default function Calendar() {
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            {format(parseISO(session.session_date), 'HH:mm')}
+                            {format(new Date(session.session_date), 'HH:mm')}
                           </div>
                           <span>{session.duration_minutes} min</span>
                         </div>
