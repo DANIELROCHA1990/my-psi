@@ -41,7 +41,7 @@ export default function Calendar() {
 
   const getSessionsForDate = (date: Date) => {
     return sessions.filter(session => 
-      isSameDay(parseISO(session.session_date), date) && 
+      isSameDay(new Date(session.session_date), date) && 
       session.payment_status !== 'cancelled'
     )
   }
