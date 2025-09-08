@@ -4,7 +4,7 @@ import { patientService } from '../services/patientService'
 import { FinancialRecord, Patient } from '../types'
 import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
@@ -93,7 +93,7 @@ export default function Financial() {
 
   // Prepare chart data
   const chartData = records.reduce((acc, record) => {
-    const month = format(new Date(record.transaction_date), 'MMM', { locale: ptBR })
+    const month = format(parseISO(record.transaction_date), 'MMM', { locale: ptBR })
     const existing = acc.find(item => item.month === month)
     
     if (existing) {
@@ -286,7 +286,7 @@ export default function Financial() {
                         {record.patients?.full_name || record.description}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>{format(new Date(record.transaction_date), 'dd/MM/yyyy')}</span>
+                        <span>{format(parseISO(record.transaction_date), 'dd/MM/yyyy')}</span>
                         <span className="capitalize">{record.payment_method}</span>
                         {record.category && <span>{record.category}</span>}
                       </div>

@@ -4,7 +4,7 @@ import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, DollarSign, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 export default function Sessions() {
@@ -58,8 +58,8 @@ export default function Sessions() {
 
   const stats = {
     total: sessions.length,
-    upcoming: sessions.filter(s => new Date(s.session_date) > new Date()).length,
-    completed: sessions.filter(s => new Date(s.session_date) < new Date()).length,
+    upcoming: sessions.filter(s => parseISO(s.session_date) > new Date()).length,
+    completed: sessions.filter(s => parseISO(s.session_date) < new Date()).length,
     paid: sessions.filter(s => s.payment_status === 'paid').length
   }
 
@@ -200,11 +200,11 @@ export default function Sessions() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        {format(new Date(session.session_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        {format(parseISO(session.session_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="h-4 w-4" />
-                        {format(new Date(session.session_date), 'HH:mm')} 
+                        {format(parseISO(session.session_date), 'HH:mm')} 
                         {session.duration_minutes && ` (${session.duration_minutes} min)`}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -310,14 +310,14 @@ function SessionModal({
   
   const [formData, setFormData] = useState({
     patient_id: session?.patient_id || '',
-    session_date: session?.session_date ? format(new Date(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
+    session_date: session?.session_date ? format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
     duration_minutes: session?.duration_minutes?.toString() || '50',
     session_type: session?.session_type || 'Sessão Individual',
     session_notes: session?.session_notes || '',
     mood_before: session?.mood_before || '',
     mood_after: session?.mood_after || '',
     homework_assigned: session?.homework_assigned || '',
-    next_session_date: session?.next_session_date ? format(new Date(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
+    next_session_date: session?.next_session_date ? format(parseISO(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
     session_price: session?.session_price?.toString() || selectedPatient?.session_price?.toString() || '',
     payment_status: session?.payment_status || 'pending',
     summary: session?.summary || ''
@@ -348,14 +348,14 @@ function SessionModal({
     try {
       const sessionData = {
         patient_id: formData.patient_id,
-        session_date: new Date(formData.session_date).toISOString(),
+        session_date: formData.session_date,
         duration_minutes: formData.duration_minutes ? Number(formData.duration_minutes) : undefined,
         session_type: formData.session_type || undefined,
         session_notes: formData.session_notes || undefined,
         mood_before: formData.mood_before || undefined,
         mood_after: formData.mood_after || undefined,
         homework_assigned: formData.homework_assigned || undefined,
-        next_session_date: formData.next_session_date ? new Date(formData.next_session_date).toISOString() : undefined,
+        next_session_date: formData.next_session_date || undefined,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         payment_status: formData.payment_status || 'pending',
         summary: formData.summary || undefined

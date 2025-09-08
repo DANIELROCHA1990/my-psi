@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { FinancialRecord } from '../types'
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
 
 export const financialService = {
   async getFinancialRecords(): Promise<FinancialRecord[]> {
@@ -24,8 +24,8 @@ export const financialService = {
   },
 
   async getWeeklyRevenue(): Promise<number> {
-    const startDate = startOfWeek(new Date()).toISOString().split('T')[0]
-    const endDate = endOfWeek(new Date()).toISOString().split('T')[0]
+    const startDate = format(startOfWeek(new Date()), 'yyyy-MM-dd')
+    const endDate = format(endOfWeek(new Date()), 'yyyy-MM-dd')
 
     const { data, error } = await supabase
       .from('financial_records')
@@ -43,8 +43,8 @@ export const financialService = {
   },
 
   async getMonthlyRevenue(): Promise<number> {
-    const startDate = startOfMonth(new Date()).toISOString().split('T')[0]
-    const endDate = endOfMonth(new Date()).toISOString().split('T')[0]
+    const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd')
 
     const { data, error } = await supabase
       .from('financial_records')

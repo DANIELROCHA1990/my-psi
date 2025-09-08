@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
-import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays } from 'date-fns'
+import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 export const sessionService = {
   async getSessions(): Promise<Session[]> {
@@ -88,9 +89,17 @@ export const sessionService = {
   },
 
   async createSession(session: Omit<Session, 'id' | 'created_at' | 'user_id'>): Promise<Session> {
+    // Garantir que a data seja tratada corretamente
+    const sessionData = {
+      ...session,
+      session_date: typeof session.session_date === 'string' 
+        ? session.session_date 
+        : new Date(session.session_date).toISOString()
+    }
+    
     const { data, error } = await supabase
       .from('sessions')
-      .insert([session])
+      .insert([sessionData])
       .select(`
         *,
         patients (
@@ -110,9 +119,17 @@ export const sessionService = {
   },
 
   async updateSession(id: string, updates: Partial<Session>): Promise<Session> {
+    // Garantir que a data seja tratada corretamente se fornecida
+    const updateData = { ...updates }
+    if (updateData.session_date) {
+      updateData.session_date = typeof updateData.session_date === 'string' 
+        ? updateData.session_date 
+        : new Date(updateData.session_date).toISOString()
+    }
+    
     const { data, error } = await supabase
       .from('sessions')
-      .update(updates)
+      .update(updateData)
       .eq('id', id)
       .select(`
         *,
@@ -149,7 +166,9 @@ export const sessionService = {
     weeksToCreate: number = 12
   ): Promise<Session[]> {
     const sessions: any[] = []
-    const startDate = startOfWeek(new Date(), { weekStartsOn: 1 }) // Segunda-feira
+    // Usar a data atual como base, não o início da semana
+    const today = new Date()
+    const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
@@ -160,7 +179,21 @@ export const sessionService = {
     
     for (let week = 0; week < weeksToCreate; week++) {
       for (const schedule of schedules) {
-        const sessionDate = addDays(addWeeks(startDate, week), schedule.dayOfWeek - 1)
+        // Calcular a próxima ocorrência do dia da semana
+        let sessionDate = addWeeks(startDate, week)
+        
+        // Ajustar para o dia da semana correto
+        const currentDay = sessionDate.getDay()
+        const targetDay = schedule.dayOfWeek === 0 ? 7 : schedule.dayOfWeek // Domingo = 7
+        const daysToAdd = (targetDay - currentDay + 7) % 7
+        
+        if (week === 0 && daysToAdd === 0 && sessionDate < today) {
+          // Se é a primeira semana e o dia já passou, pular para a próxima semana
+          sessionDate = addWeeks(sessionDate, 1)
+        } else {
+          sessionDate = addDays(sessionDate, daysToAdd)
+        }
+        
         const [hours, minutes] = schedule.time.split(':').map(Number)
         const sessionDateTime = setMinutes(setHours(sessionDate, hours), minutes)
         

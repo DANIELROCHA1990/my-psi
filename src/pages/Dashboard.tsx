@@ -13,7 +13,7 @@ import {
   AlertCircle,
   FileText
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 export default function Dashboard() {
@@ -156,7 +156,7 @@ export default function Dashboard() {
                     <div>
                       <p className="font-medium text-gray-900">{session.patients?.full_name}</p>
                       <p className="text-sm text-gray-600">
-                        {format(new Date(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                        {format(parseISO(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                     <div className="text-right">

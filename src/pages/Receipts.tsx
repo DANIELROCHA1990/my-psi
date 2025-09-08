@@ -4,7 +4,7 @@ import { sessionService } from '../services/sessionService'
 import { Patient, Session } from '../types'
 import { FileText, Search, Download, Send, Calendar, User, DollarSign, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 interface Receipt {
@@ -241,7 +241,7 @@ export default function Receipts() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        {format(new Date(receipt.issueDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        {format(parseISO(receipt.issueDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <DollarSign className="h-4 w-4" />
@@ -250,7 +250,7 @@ export default function Receipts() {
                     </div>
                     
                     <div className="text-xs text-gray-500">
-                      Sessão: {format(new Date(receipt.session.session_date), 'dd/MM/yyyy HH:mm')} - {receipt.session.session_type}
+                      Sessão: {format(parseISO(receipt.session.session_date), 'dd/MM/yyyy HH:mm')} - {receipt.session.session_type}
                     </div>
                   </div>
                   
