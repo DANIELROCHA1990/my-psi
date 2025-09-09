@@ -4,9 +4,14 @@ import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
-import { utcToZonedTime } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
+import { utcToZonedTime } from 'date-fns-tz'
 import toast from 'react-hot-toast'
+
+// 🔧 Utilitário: força todas as datas a serem interpretadas em UTC
+function parseUTC(dateString: string): Date {
+  return utcToZonedTime(parseISO(dateString), 'UTC')
+}
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -41,10 +46,10 @@ export default function Calendar() {
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
   const getSessionsForDate = (date: Date) => {
-    return sessions.filter(session => 
-      isSameDay(parseISO(session.session_date), date) && 
-      session.payment_status !== 'cancelled'
-    )
+    return sessions.filter(session => {
+      const sessionDate = parseUTC(session.session_date)
+      return isSameDay(sessionDate, date) && session.payment_status !== 'cancelled'
+    })
   }
 
   const handleDateClick = (date: Date) => {
@@ -138,7 +143,7 @@ export default function Calendar() {
                       
                       {daySessions.length > 0 && (
                         <div className="mt-1 space-y-1">
-                          {daySessions.slice(0, 2).map((session, index) => (
+                          {daySessions.slice(0, 2).map((session) => (
                             <div
                               key={session.id}
                               className={`text-xs px-1 py-0.5 rounded truncate ${
@@ -149,7 +154,7 @@ export default function Calendar() {
                                   : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {format(parseISO(session.session_date), 'HH:mm')}
+                              {format(parseUTC(session.session_date), 'HH:mm')}
                             </div>
                           ))}
                           {daySessions.length > 2 && (
@@ -210,7 +215,7 @@ export default function Calendar() {
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            {format(new Date(session.session_date), 'HH:mm')}
+                            {format(parseUTC(session.session_date), 'HH:mm')}
                           </div>
                           <span>{session.duration_minutes} min</span>
                         </div>
