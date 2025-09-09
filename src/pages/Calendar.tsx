@@ -41,7 +41,7 @@ export default function Calendar() {
 
   const getSessionsForDate = (date: Date) => {
     return sessions.filter(session => 
-      isSameDay(new Date(session.session_date), date) && 
+      isSameDay(parseISO(session.session_date), date) && 
       session.payment_status !== 'cancelled'
     )
   }
@@ -148,7 +148,7 @@ export default function Calendar() {
                                   : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {format(parseISO(session.session_date), 'HH:mm')} - {session.patients?.full_name}
+                              {format(parseISO(session.session_date), 'HH:mm')}
                             </div>
                           ))}
                           {daySessions.length > 2 && (

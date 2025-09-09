@@ -167,13 +167,8 @@ export const sessionService = {
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    // Usar a próxima segunda-feira como referência para evitar problemas de timezone
     const today = new Date()
-    const currentDay = today.getDay() // 0 = domingo, 1 = segunda, etc.
-    const daysUntilMonday = currentDay === 0 ? 1 : (8 - currentDay) % 7
-    const nextMonday = new Date(today)
-    nextMonday.setDate(today.getDate() + daysUntilMonday)
-    nextMonday.setHours(0, 0, 0, 0) // Zerar horas para evitar problemas de timezone
+    today.setHours(0, 0, 0, 0) // Zerar horas para trabalhar apenas com datas
     
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
@@ -184,26 +179,34 @@ export const sessionService = {
     
     for (let week = 0; week < weeksToCreate; week++) {
       for (const schedule of schedules) {
-        // Calcular a data da sessão baseada na segunda-feira de referência
-        const weekStart = addWeeks(nextMonday, week)
+        // Encontrar a próxima ocorrência do dia da semana especificado
+        let sessionDate = new Date(today)
+        sessionDate.setDate(today.getDate() + (week * 7))
         
-        // Calcular quantos dias adicionar à segunda-feira para chegar no dia desejado
-        // schedule.dayOfWeek: 0=domingo, 1=segunda, 2=terça, 3=quarta, 4=quinta, 5=sexta, 6=sábado
-        let daysToAdd = schedule.dayOfWeek === 0 ? 6 : schedule.dayOfWeek - 1 // Converter para dias desde segunda
+        // Ajustar para o dia da semana correto
+        const currentDayOfWeek = sessionDate.getDay()
+        const targetDayOfWeek = schedule.dayOfWeek
         
-        const sessionDate = addDays(weekStart, daysToAdd)
+        // Calcular quantos dias adicionar para chegar no dia desejado
+        let daysToAdd = targetDayOfWeek - currentDayOfWeek
+        if (daysToAdd < 0) {
+          daysToAdd += 7 // Se o dia já passou nesta semana, ir para a próxima
+        }
+        
+        sessionDate.setDate(sessionDate.getDate() + daysToAdd)
         
         // Pular sessões que já passaram (apenas para a primeira semana)
-        if (week === 0 && sessionDate < today) {
+        if (sessionDate < today) {
           continue
         }
         
+        // Definir o horário específico
         const [hours, minutes] = schedule.time.split(':').map(Number)
-        const sessionDateTime = setMinutes(setHours(sessionDate, hours), minutes)
+        sessionDate.setHours(hours, minutes, 0, 0)
         
         sessions.push({
           patient_id: patientId,
-          session_date: sessionDateTime.toISOString(),
+          session_date: sessionDate.toISOString(),
           duration_minutes: 50,
           session_type: 'Sessão Individual',
           session_price: patient?.session_price || null,
