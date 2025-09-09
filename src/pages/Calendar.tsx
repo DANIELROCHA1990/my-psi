@@ -10,8 +10,12 @@ import toast from 'react-hot-toast'
 
 // 🔧 Utilitário: força todas as datas a serem interpretadas em UTC
 function parseUTC(dateString: string): Date {
-  return utcToZonedTime(parseISO(dateString), 'UTC')
+  if (!dateString) return new Date()
+  // remove o "Z" no final (que força UTC e causa o deslocamento de fuso)
+  const clean = dateString.replace(/Z$/, '')
+  return parseISO(clean)
 }
+
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
