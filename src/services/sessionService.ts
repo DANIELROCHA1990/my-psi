@@ -134,7 +134,7 @@ export const sessionService = {
     if (updateData.session_date) {
       updateData.session_date = typeof updateData.session_date === 'string' 
         ? updateData.session_date 
-        : new Date(updateData.session_date).toISOString()
+        : toUTCISOStringLocal(new Date(updateData.session_date))
     }
     
     const { data, error } = await supabase
