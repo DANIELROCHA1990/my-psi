@@ -216,7 +216,7 @@ export const sessionService = {
         
         sessions.push({
           patient_id: patientId,
-          session_date: toUTCISOStringLocal(selectedDate),
+          session_date: toUTCISOStringLocal(sessionDate),
           duration_minutes: 50,
           session_type: 'Sessão Individual',
           session_price: patient?.session_price || null,
