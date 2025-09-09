@@ -1,16 +1,14 @@
+// SessionService.ts
+
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
 import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-function toUTCISOStringLocal(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hour = String(date.getHours()).padStart(2, '0')
-  const minute = String(date.getMinutes()).padStart(2, '0')
-  const second = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}`
+// 🔧 Utilitário: Converte um objeto Date (que é local) para uma string ISO 8601 UTC
+// Ex: Se date é 2023-10-25 09:00:00 (local, UTC-3), retorna "2023-10-25T12:00:00Z"
+function toISOStringUTC(date: Date): string {
+  return date.toISOString(); // O método toISOString() de Date já retorna a data em UTC com 'Z'
 }
 
 export const sessionService = {
@@ -36,7 +34,8 @@ export const sessionService = {
   },
 
   async getUpcomingSessions(): Promise<Session[]> {
-    const now = new Date().toISOString()
+    // Ao comparar com now, é importante que now também seja UTC para uma comparação correta com o banco de dados
+    const now = new Date().toISOString(); // toISOString() já retorna em UTC
     
     const { data, error } = await supabase
       .from('sessions')
@@ -99,12 +98,13 @@ export const sessionService = {
   },
 
   async createSession(session: Omit<Session, 'id' | 'created_at' | 'user_id'>): Promise<Session> {
-    // Garantir que a data seja tratada corretamente
     const sessionData = {
       ...session,
+      // Se session.session_date já é uma string ISO UTC (ex: vindo de um date picker que já lida com UTC), use-a.
+      // Caso contrário, converta o objeto Date local para string ISO UTC.
       session_date: typeof session.session_date === 'string' 
         ? session.session_date 
-        : toUTCISOStringLocal(new Date(session.session_date))
+        : toISOStringUTC(new Date(session.session_date))
     }
     
     const { data, error } = await supabase
@@ -129,12 +129,12 @@ export const sessionService = {
   },
 
   async updateSession(id: string, updates: Partial<Session>): Promise<Session> {
-    // Garantir que a data seja tratada corretamente se fornecida
     const updateData = { ...updates }
     if (updateData.session_date) {
+      // Mesma lógica de conversão para UTC ao atualizar
       updateData.session_date = typeof updateData.session_date === 'string' 
         ? updateData.session_date 
-        : toUTCISOStringLocal(new Date(updateData.session_date))
+        : toISOStringUTC(new Date(updateData.session_date))
     }
     
     const { data, error } = await supabase
@@ -177,8 +177,9 @@ export const sessionService = {
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Zerar horas para trabalhar apenas com datas
+    // Obter a data atual no fuso horário local, mas zerar o tempo para comparações de dia
+    const todayLocal = new Date();
+    todayLocal.setHours(0, 0, 0, 0); 
     
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
@@ -189,34 +190,33 @@ export const sessionService = {
     
     for (let week = 0; week < weeksToCreate; week++) {
       for (const schedule of schedules) {
-        // Encontrar a próxima ocorrência do dia da semana especificado
-        let sessionDate = new Date(today)
-        sessionDate.setDate(today.getDate() + (week * 7))
+        // Começar com a data de hoje (local) e adicionar as semanas
+        let sessionDateLocal = new Date(todayLocal);
+        sessionDateLocal.setDate(todayLocal.getDate() + (week * 7));
         
-        // Ajustar para o dia da semana correto
-        const currentDayOfWeek = sessionDate.getDay()
-        const targetDayOfWeek = schedule.dayOfWeek
+        // Ajustar para o dia da semana correto (0 = Dom, 1 = Seg, ..., 6 = Sáb)
+        const currentDayOfWeek = sessionDateLocal.getDay();
+        const targetDayOfWeek = schedule.dayOfWeek;
         
-        // Calcular quantos dias adicionar para chegar no dia desejado
-        let daysToAdd = targetDayOfWeek - currentDayOfWeek
+        let daysToAdd = targetDayOfWeek - currentDayOfWeek;
         if (daysToAdd < 0) {
-          daysToAdd += 7 // Se o dia já passou nesta semana, ir para a próxima
+          daysToAdd += 7; // Se o dia já passou nesta semana, ir para a próxima
         }
         
-        sessionDate.setDate(sessionDate.getDate() + daysToAdd)
+        sessionDateLocal.setDate(sessionDateLocal.getDate() + daysToAdd);
         
-        // Pular sessões que já passaram (apenas para a primeira semana)
-        if (sessionDate < today) {
-          continue
+        // Definir o horário específico no objeto Date local
+        const [hours, minutes] = schedule.time.split(':').map(Number);
+        sessionDateLocal.setHours(hours, minutes, 0, 0); 
+        
+        // Pular sessões que já passaram (comparação no fuso horário local)
+        if (sessionDateLocal < todayLocal) {
+          continue;
         }
-        
-        // Definir o horário específico
-        const [hours, minutes] = schedule.time.split(':').map(Number)
-        sessionDate.setHours(hours, minutes, 0, 0) 
         
         sessions.push({
           patient_id: patientId,
-          session_date: toUTCISOStringLocal(sessionDate),
+          session_date: toISOStringUTC(sessionDateLocal), // <-- CONVERTER PARA UTC AQUI
           duration_minutes: 50,
           session_type: 'Sessão Individual',
           session_price: patient?.session_price || null,
