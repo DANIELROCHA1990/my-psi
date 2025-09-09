@@ -359,14 +359,14 @@ function PatientModal({
         if (error) throw error
         toast.success('Paciente atualizado com sucesso')
       } else {
-        const { error } = await patientService.createPatient(patientData as any)
+        const { data: newPatient, error } = await patientService.createPatient(patientData as any)
         if (error) throw error
         
         // Se deve criar sessões automaticamente
         if (createSessions && sessionSchedules.length > 0) {
           try {
             await sessionService.createMultipleSessions(
-              error ? '' : 'new-patient-id', // Precisamos do ID do paciente criado
+              newPatient?.id || '',
               sessionSchedules,
               12 // Criar sessões para 12 semanas
             )
