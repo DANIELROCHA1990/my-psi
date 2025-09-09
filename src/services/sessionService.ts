@@ -212,7 +212,7 @@ export const sessionService = {
         
         // Definir o horário específico
         const [hours, minutes] = schedule.time.split(':').map(Number)
-        sessionDate.setHours(hours, minutes, 0, 0)
+        sessionDate.setHours(hours, minutes, 0, 0) 
         
         sessions.push({
           patient_id: patientId,
