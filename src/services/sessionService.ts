@@ -1,17 +1,35 @@
-// SessionService.ts
+// MultipleFiles/SessionService.ts
 
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
 import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-// 🔧 Utilitário: Converte um objeto Date (que é local) para uma string ISO 8601 UTC
-// Ex: Se date é 2023-10-25 09:00:00 (local, UTC-3), retorna "2023-10-25T12:00:00Z"
+/**
+ * 🔧 Utilitário: Converte um objeto Date (que é sempre no fuso horário local do ambiente)
+ * para uma string ISO 8601 em UTC (com o 'Z' no final).
+ *
+ * Exemplo:
+ * Se o fuso horário local é UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
+ * este método retornará "2023-10-25T12:00:00.000Z".
+ *
+ * Isso garante que a data e hora agendadas localmente sejam corretamente
+ * convertidas e armazenadas em um formato universal (UTC) no banco de dados.
+ *
+ * @param date O objeto Date local a ser convertido.
+ * @returns Uma string ISO 8601 representando a data em UTC.
+ */
 function toISOStringUTC(date: Date): string {
-  return date.toISOString(); // O método toISOString() de Date já retorna a data em UTC com 'Z'
+  return date.toISOString();
 }
 
 export const sessionService = {
+  /**
+   * Busca todas as sessões do banco de dados, incluindo os dados do paciente associado.
+   * As sessões são ordenadas pela data da sessão em ordem decrescente.
+   * @returns Uma Promise que resolve para um array de objetos Session.
+   * @throws Erro se a busca falhar.
+   */
   async getSessions(): Promise<Session[]> {
     const { data, error } = await supabase
       .from('sessions')
@@ -33,9 +51,16 @@ export const sessionService = {
     return data || []
   },
 
+  /**
+   * Busca as próximas sessões (com data maior ou igual à data atual).
+   * As sessões são ordenadas pela data da sessão em ordem crescente.
+   * A comparação é feita em UTC para garantir consistência com o banco de dados.
+   * @returns Uma Promise que resolve para um array de objetos Session.
+   * @throws Erro se a busca falhar.
+   */
   async getUpcomingSessions(): Promise<Session[]> {
-    // Ao comparar com now, é importante que now também seja UTC para uma comparação correta com o banco de dados
-    const now = new Date().toISOString(); // toISOString() já retorna em UTC
+    // Obtém a data e hora atual em UTC para comparação consistente com o banco de dados.
+    const now = new Date().toISOString();
     
     const { data, error } = await supabase
       .from('sessions')
@@ -48,7 +73,7 @@ export const sessionService = {
           phone
         )
       `)
-      .gte('session_date', now)
+      .gte('session_date', now) // Compara com a string ISO UTC
       .order('session_date', { ascending: true })
 
     if (error) {
@@ -58,6 +83,13 @@ export const sessionService = {
     return data || []
   },
 
+  /**
+   * Busca uma sessão específica pelo seu ID.
+   * Inclui todos os dados detalhados do paciente associado.
+   * @param id O ID da sessão.
+   * @returns Uma Promise que resolve para o objeto Session ou null se não encontrada.
+   * @throws Erro se a busca falhar por outro motivo que não seja "não encontrada".
+   */
   async getSession(id: string): Promise<Session | null> {
     const { data, error } = await supabase
       .from('sessions')
@@ -88,6 +120,7 @@ export const sessionService = {
       .single()
 
     if (error) {
+      // PGRST116 é o código de erro para "não encontrado" no Supabase (PostgREST)
       if (error.code === 'PGRST116') {
         return null
       }
@@ -97,11 +130,18 @@ export const sessionService = {
     return data
   },
 
+  /**
+   * Cria uma nova sessão no banco de dados.
+   * Garante que a 'session_date' seja convertida para UTC antes de ser salva.
+   * @param session O objeto Session (sem 'id', 'created_at', 'user_id').
+   * @returns Uma Promise que resolve para o objeto Session criado.
+   * @throws Erro se a criação falhar.
+   */
   async createSession(session: Omit<Session, 'id' | 'created_at' | 'user_id'>): Promise<Session> {
     const sessionData = {
       ...session,
-      // Se session.session_date já é uma string ISO UTC (ex: vindo de um date picker que já lida com UTC), use-a.
-      // Caso contrário, converta o objeto Date local para string ISO UTC.
+      // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar.
+      // Assume que session.session_date pode vir como string (já formatada) ou Date.
       session_date: typeof session.session_date === 'string' 
         ? session.session_date 
         : toISOStringUTC(new Date(session.session_date))
@@ -128,10 +168,18 @@ export const sessionService = {
     return data
   },
 
+  /**
+   * Atualiza uma sessão existente no banco de dados.
+   * Garante que a 'session_date' (se fornecida) seja convertida para UTC antes de ser salva.
+   * @param id O ID da sessão a ser atualizada.
+   * @param updates Um objeto com os campos a serem atualizados.
+   * @returns Uma Promise que resolve para o objeto Session atualizado.
+   * @throws Erro se a atualização falhar.
+   */
   async updateSession(id: string, updates: Partial<Session>): Promise<Session> {
     const updateData = { ...updates }
     if (updateData.session_date) {
-      // Mesma lógica de conversão para UTC ao atualizar
+      // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar, se a data for atualizada.
       updateData.session_date = typeof updateData.session_date === 'string' 
         ? updateData.session_date 
         : toISOStringUTC(new Date(updateData.session_date))
@@ -159,6 +207,12 @@ export const sessionService = {
     return data
   },
 
+  /**
+   * Exclui uma sessão do banco de dados.
+   * @param id O ID da sessão a ser excluída.
+   * @returns Uma Promise vazia.
+   * @throws Erro se a exclusão falhar.
+   */
   async deleteSession(id: string): Promise<void> {
     const { error } = await supabase
       .from('sessions')
@@ -170,6 +224,16 @@ export const sessionService = {
     }
   },
 
+  /**
+   * Cria múltiplas sessões recorrentes para um paciente.
+   * Calcula as datas das sessões com base nos agendamentos e número de semanas,
+   * garantindo que as datas sejam salvas em UTC.
+   * @param patientId O ID do paciente.
+   * @param schedules Um array de objetos com o dia da semana (0=Dom, 6=Sáb), hora e status de pagamento.
+   * @param weeksToCreate O número de semanas para criar sessões (padrão: 12).
+   * @returns Uma Promise que resolve para um array de objetos Session criados.
+   * @throws Erro se a criação falhar.
+   */
   async createMultipleSessions(
     patientId: string, 
     schedules: Array<{dayOfWeek: number, time: string, paymentStatus: string}>,
@@ -177,9 +241,11 @@ export const sessionService = {
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    // Obter a data atual no fuso horário local, mas zerar o tempo para comparações de dia
-    const todayLocal = new Date();
-    todayLocal.setHours(0, 0, 0, 0); 
+    // Obtém a data e hora atual no fuso horário local do ambiente.
+    // Zera as horas, minutos, segundos e milissegundos para ter um ponto de partida limpo
+    // que representa o INÍCIO do dia atual no fuso horário local.
+    const nowLocal = new Date();
+    nowLocal.setHours(0, 0, 0, 0); 
     
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
@@ -190,33 +256,43 @@ export const sessionService = {
     
     for (let week = 0; week < weeksToCreate; week++) {
       for (const schedule of schedules) {
-        // Começar com a data de hoje (local) e adicionar as semanas
-        let sessionDateLocal = new Date(todayLocal);
-        sessionDateLocal.setDate(todayLocal.getDate() + (week * 7));
+        // 1. Começar com uma cópia do 'nowLocal' para cada sessão, garantindo que
+        // a base seja o início do dia atual no fuso horário local.
+        let sessionDateLocal = new Date(nowLocal);
         
-        // Ajustar para o dia da semana correto (0 = Dom, 1 = Seg, ..., 6 = Sáb)
+        // 2. Adicionar as semanas à data base.
+        sessionDateLocal.setDate(sessionDateLocal.getDate() + (week * 7));
+        
+        // 3. Ajustar para o dia da semana correto.
+        // getDay() retorna o dia da semana local (0 para domingo, 6 para sábado).
         const currentDayOfWeek = sessionDateLocal.getDay();
         const targetDayOfWeek = schedule.dayOfWeek;
         
         let daysToAdd = targetDayOfWeek - currentDayOfWeek;
+        // Se o dia da semana desejado já passou na semana atual,
+        // adiciona 7 dias para ir para a próxima ocorrência desse dia.
         if (daysToAdd < 0) {
-          daysToAdd += 7; // Se o dia já passou nesta semana, ir para a próxima
+          daysToAdd += 7;
         }
         
         sessionDateLocal.setDate(sessionDateLocal.getDate() + daysToAdd);
         
-        // Definir o horário específico no objeto Date local
+        // 4. Definir o horário específico (horas e minutos) no objeto Date local.
         const [hours, minutes] = schedule.time.split(':').map(Number);
         sessionDateLocal.setHours(hours, minutes, 0, 0); 
         
-        // Pular sessões que já passaram (comparação no fuso horário local)
-        if (sessionDateLocal < todayLocal) {
+        // 5. Pular sessões que já passaram.
+        // Compara a data e hora da sessão (local) com o início do dia atual (local).
+        // Isso evita agendar sessões no passado na primeira "rodada" de agendamentos.
+        if (sessionDateLocal < nowLocal) {
           continue;
         }
         
         sessions.push({
           patient_id: patientId,
-          session_date: toISOStringUTC(sessionDateLocal), // <-- CONVERTER PARA UTC AQUI
+          // 6. Converte a data e hora final (que está no fuso horário local) para UTC
+          // antes de enviar para o banco de dados.
+          session_date: toISOStringUTC(sessionDateLocal),
           duration_minutes: 50,
           session_type: 'Sessão Individual',
           session_price: patient?.session_price || null,
