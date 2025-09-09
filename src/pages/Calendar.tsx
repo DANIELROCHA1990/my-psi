@@ -5,7 +5,6 @@ import { Session, Patient } from '../types'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { utcToZonedTime } from 'date-fns-tz'
 import toast from 'react-hot-toast'
 
 // 🔧 Utilitário: força todas as datas a serem interpretadas em UTC
