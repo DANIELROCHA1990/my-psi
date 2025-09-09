@@ -1,3 +1,5 @@
+// Calendar.tsx
+
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
 import { patientService } from '../services/patientService'
@@ -7,20 +9,25 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameM
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 
-// 🔧 Utilitário: força todas as datas a serem interpretadas em UTC
+// 🔧 Utilitário: Garante que todas as datas sejam interpretadas como UTC.
+// Se a string já tem 'Z', parseISO a trata como UTC.
+// Se não tem 'Z', mas sabemos que o backend envia UTC, podemos adicionar 'Z' para forçar a interpretação.
+// No entanto, com a correção no SessionService, as datas do backend SEMPRE terão 'Z'.
+// Então, parseISO(dateString) já é suficiente.
 function parseUTC(dateString: string): Date {
-  if (!dateString) return new Date()
-  // remove o "Z" no final (que força UTC e causa o deslocamento de fuso)
-  const clean = dateString.replace(/Z$/, '')
-  return parseISO(clean)
+  if (!dateString) return new Date();
+  // Com o SessionService corrigido, as datas do Supabase virão com 'Z'.
+  // parseISO() com 'Z' já interpreta como UTC.
+  // Não precisamos mais remover ou adicionar 'Z' aqui, apenas parsear.
+  return parseISO(dateString);
 }
 
 
 export default function Calendar() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState(new Date()) // currentDate é um objeto Date local
   const [sessions, setSessions] = useState<Session[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null) // selectedDate é um objeto Date local
   const [selectedDateSessions, setSelectedDateSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -44,14 +51,20 @@ export default function Calendar() {
     }
   }
 
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  const monthStart = startOfMonth(currentDate) // Objeto Date local
+  const monthEnd = endOfMonth(currentDate)     // Objeto Date local
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd }) // Array de objetos Date locais (meia-noite)
 
-  const getSessionsForDate = (date: Date) => {
+  const getSessionsForDate = (date: Date) => { // 'date' é um objeto Date local (meia-noite)
     return sessions.filter(session => {
-      const sessionDate = parseUTC(session.session_date)
-      return isSameDay(sessionDate, date) && session.payment_status !== 'cancelled'
+      const sessionDateUTC = parseUTC(session.session_date) // sessionDateUTC é um objeto Date que representa a data/hora em UTC
+      
+      // Para comparar se a sessão cai no 'date' local, precisamos converter sessionDateUTC para o fuso horário local
+      // e então comparar o dia.
+      // isSameDay(date-fns) compara o dia, mês e ano de dois objetos Date, ignorando o tempo.
+      // Se sessionDateUTC é 2023-10-25T12:00:00Z (9 AM local) e 'date' é 2023-10-25T00:00:00 (local),
+      // isSameDay() funcionará corretamente.
+      return isSameDay(sessionDateUTC, date) && session.payment_status !== 'cancelled'
     })
   }
 
@@ -157,6 +170,7 @@ export default function Calendar() {
                                   : 'bg-gray-100 text-gray-800'
                               }`}
                             >
+                              {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
                               {format(parseUTC(session.session_date), 'HH:mm')}
                             </div>
                           ))}
@@ -218,6 +232,7 @@ export default function Calendar() {
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
+                            {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
                             {format(parseUTC(session.session_date), 'HH:mm')}
                           </div>
                           <span>{session.duration_minutes} min</span>
