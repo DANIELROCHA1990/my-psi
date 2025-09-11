@@ -4,8 +4,27 @@ import { sessionService } from '../services/sessionService'
 import { Patient, Session } from '../types'
 import { FileText, Search, Download, Send, Calendar, User, DollarSign, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+/**
+ * 🔧 Utilitário: Converte uma string de data (com ou sem timezone) para um objeto Date local
+ * Isso garante que sempre trabalhemos com datas locais, ignorando qualquer informação de timezone.
+ */
+function parseLocalDate(dateString: string): Date {
+  if (!dateString) return new Date()
+  
+  // Remove qualquer informação de timezone (Z, +00:00, etc.)
+  const cleanDateString = dateString.replace(/[Z]|[+-]\d{2}:\d{2}$/g, '')
+  
+  // Se a string não tem horário, adiciona 00:00:00
+  const fullDateString = cleanDateString.includes('T') 
+    ? cleanDateString 
+    : `${cleanDateString}T00:00:00`
+  
+  // Cria o Date usando o construtor que interpreta como horário local
+  return new Date(fullDateString)
+}
 
 interface Receipt {
   id: string
@@ -241,7 +260,7 @@ export default function Receipts() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        {format(parseISO(receipt.issueDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        {format(parseLocalDate(receipt.issueDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <DollarSign className="h-4 w-4" />
@@ -250,7 +269,7 @@ export default function Receipts() {
                     </div>
                     
                     <div className="text-xs text-gray-500">
-                      Sessão: {format(parseISO(receipt.session.session_date), 'dd/MM/yyyy HH:mm')} - {receipt.session.session_type}
+                      Sessão: {format(parseLocalDate(receipt.session.session_date), 'dd/MM/yyyy HH:mm')} - {receipt.session.session_type}
                     </div>
                   </div>
                   

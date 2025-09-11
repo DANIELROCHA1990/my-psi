@@ -4,8 +4,27 @@ import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
 import { Plus, Search, Edit, Trash2, Calendar, Clock, User, DollarSign, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+/**
+ * 🔧 Utilitário: Converte uma string de data (com ou sem timezone) para um objeto Date local
+ * Isso garante que sempre trabalhemos com datas locais, ignorando qualquer informação de timezone.
+ */
+function parseLocalDate(dateString: string): Date {
+  if (!dateString) return new Date()
+  
+  // Remove qualquer informação de timezone (Z, +00:00, etc.)
+  const cleanDateString = dateString.replace(/[Z]|[+-]\d{2}:\d{2}$/g, '')
+  
+  // Se a string não tem horário, adiciona 00:00:00
+  const fullDateString = cleanDateString.includes('T') 
+    ? cleanDateString 
+    : `${cleanDateString}T00:00:00`
+  
+  // Cria o Date usando o construtor que interpreta como horário local
+  return new Date(fullDateString)
+}
 
 export default function Sessions() {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -58,8 +77,8 @@ export default function Sessions() {
 
   const stats = {
     total: sessions.length,
-    upcoming: sessions.filter(s => parseISO(s.session_date) > new Date()).length,
-    completed: sessions.filter(s => parseISO(s.session_date) < new Date()).length,
+    upcoming: sessions.filter(s => parseLocalDate(s.session_date) > new Date()).length,
+    completed: sessions.filter(s => parseLocalDate(s.session_date) < new Date()).length,
     paid: sessions.filter(s => s.payment_status === 'paid').length
   }
 
@@ -200,11 +219,11 @@ export default function Sessions() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        {format(parseISO(session.session_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        {format(parseLocalDate(session.session_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="h-4 w-4" />
-                        {format(parseISO(session.session_date), 'HH:mm')} 
+                        {format(parseLocalDate(session.session_date), 'HH:mm')} 
                         {session.duration_minutes && ` (${session.duration_minutes} min)`}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -310,14 +329,14 @@ function SessionModal({
   
   const [formData, setFormData] = useState({
     patient_id: session?.patient_id || '',
-    session_date: session?.session_date ? format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
+    session_date: session?.session_date ? format(parseLocalDate(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
     duration_minutes: session?.duration_minutes?.toString() || '50',
     session_type: session?.session_type || 'Sessão Individual',
     session_notes: session?.session_notes || '',
     mood_before: session?.mood_before || '',
     mood_after: session?.mood_after || '',
     homework_assigned: session?.homework_assigned || '',
-    next_session_date: session?.next_session_date ? format(parseISO(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
+    next_session_date: session?.next_session_date ? format(parseLocalDate(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
     session_price: session?.session_price?.toString() || selectedPatient?.session_price?.toString() || '',
     payment_status: session?.payment_status || 'pending',
     summary: session?.summary || ''

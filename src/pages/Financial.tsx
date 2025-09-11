@@ -4,9 +4,28 @@ import { patientService } from '../services/patientService'
 import { FinancialRecord, Patient } from '../types'
 import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+
+/**
+ * 🔧 Utilitário: Converte uma string de data (com ou sem timezone) para um objeto Date local
+ * Isso garante que sempre trabalhemos com datas locais, ignorando qualquer informação de timezone.
+ */
+function parseLocalDate(dateString: string): Date {
+  if (!dateString) return new Date()
+  
+  // Remove qualquer informação de timezone (Z, +00:00, etc.)
+  const cleanDateString = dateString.replace(/[Z]|[+-]\d{2}:\d{2}$/g, '')
+  
+  // Se a string não tem horário, adiciona 00:00:00
+  const fullDateString = cleanDateString.includes('T') 
+    ? cleanDateString 
+    : `${cleanDateString}T00:00:00`
+  
+  // Cria o Date usando o construtor que interpreta como horário local
+  return new Date(fullDateString)
+}
 
 export default function Financial() {
   const [records, setRecords] = useState<FinancialRecord[]>([])
@@ -93,7 +112,7 @@ export default function Financial() {
 
   // Prepare chart data
   const chartData = records.reduce((acc, record) => {
-    const month = format(parseISO(record.transaction_date), 'MMM', { locale: ptBR })
+    const month = format(parseLocalDate(record.transaction_date), 'MMM', { locale: ptBR })
     const existing = acc.find(item => item.month === month)
     
     if (existing) {
@@ -286,7 +305,7 @@ export default function Financial() {
                         {record.patients?.full_name || record.description}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>{format(parseISO(record.transaction_date), 'dd/MM/yyyy')}</span>
+                        <span>{format(parseLocalDate(record.transaction_date), 'dd/MM/yyyy')}</span>
                         <span className="capitalize">{record.payment_method}</span>
                         {record.category && <span>{record.category}</span>}
                       </div>

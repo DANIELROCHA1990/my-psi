@@ -13,8 +13,27 @@ import {
   AlertCircle,
   FileText
 } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+/**
+ * 🔧 Utilitário: Converte uma string de data (com ou sem timezone) para um objeto Date local
+ * Isso garante que sempre trabalhemos com datas locais, ignorando qualquer informação de timezone.
+ */
+function parseLocalDate(dateString: string): Date {
+  if (!dateString) return new Date()
+  
+  // Remove qualquer informação de timezone (Z, +00:00, etc.)
+  const cleanDateString = dateString.replace(/[Z]|[+-]\d{2}:\d{2}$/g, '')
+  
+  // Se a string não tem horário, adiciona 00:00:00
+  const fullDateString = cleanDateString.includes('T') 
+    ? cleanDateString 
+    : `${cleanDateString}T00:00:00`
+  
+  // Cria o Date usando o construtor que interpreta como horário local
+  return new Date(fullDateString)
+}
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -156,7 +175,7 @@ export default function Dashboard() {
                     <div>
                       <p className="font-medium text-gray-900">{session.patients?.full_name}</p>
                       <p className="text-sm text-gray-600">
-                        {format(parseISO(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                        {format(parseLocalDate(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                     <div className="text-right">

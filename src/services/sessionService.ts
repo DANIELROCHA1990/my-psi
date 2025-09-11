@@ -1,26 +1,47 @@
-// MultipleFiles/SessionService.ts
-
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
-import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays, parseISO } from 'date-fns'
+import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 /**
- * 🔧 Utilitário: Converte um objeto Date (que é sempre no fuso horário local do ambiente)
- * para uma string ISO 8601 em UTC (com o 'Z' no final).
- *
- * Exemplo:
- * Se o fuso horário local é UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
- * este método retornará "2023-10-25T12:00:00.000Z".
- *
- * Isso garante que a data e hora agendadas localmente sejam corretamente
- * convertidas e armazenadas em um formato universal (UTC) no banco de dados.
- *
+ * 🔧 Utilitário: Converte um objeto Date para uma string no formato ISO sem timezone (YYYY-MM-DDTHH:mm:ss)
+ * Isso garante que a data seja tratada como "local" pelo banco de dados, sem conversões de timezone.
+ * 
+ * Exemplo: Se 'date' representa 2023-10-25 09:00:00 local,
+ * este método retornará "2023-10-25T09:00:00".
+ * 
  * @param date O objeto Date local a ser convertido.
- * @returns Uma string ISO 8601 representando a data em UTC.
+ * @returns Uma string ISO sem timezone representando a data local.
  */
-function toISOStringUTC(date: Date): string {
-  return date.toISOString();
+function toLocalISOString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
+/**
+ * 🔧 Utilitário: Converte uma string de data (com ou sem timezone) para um objeto Date local
+ * Isso garante que sempre trabalhemos com datas locais, ignorando qualquer informação de timezone.
+ * 
+ * @param dateString A string de data a ser convertida.
+ * @returns Um objeto Date representando a data/hora local.
+ */
+function parseLocalDate(dateString: string): Date {
+  // Remove qualquer informação de timezone (Z, +00:00, etc.)
+  const cleanDateString = dateString.replace(/[Z]|[+-]\d{2}:\d{2}$/g, '')
+  
+  // Se a string não tem horário, adiciona 00:00:00
+  const fullDateString = cleanDateString.includes('T') 
+    ? cleanDateString 
+    : `${cleanDateString}T00:00:00`
+  
+  // Cria o Date usando o construtor que interpreta como horário local
+  return new Date(fullDateString)
 }
 
 export const sessionService = {
@@ -54,13 +75,13 @@ export const sessionService = {
   /**
    * Busca as próximas sessões (com data maior ou igual à data atual).
    * As sessões são ordenadas pela data da sessão em ordem crescente.
-   * A comparação é feita em UTC para garantir consistência com o banco de dados.
+   * A comparação é feita usando datas locais.
    * @returns Uma Promise que resolve para um array de objetos Session.
    * @throws Erro se a busca falhar.
    */
   async getUpcomingSessions(): Promise<Session[]> {
-    // Obtém a data e hora atual em UTC para comparação consistente com o banco de dados.
-    const now = new Date().toISOString();
+    // Obtém a data e hora atual local no formato ISO sem timezone
+    const now = toLocalISOString(new Date())
     
     const { data, error } = await supabase
       .from('sessions')
@@ -73,7 +94,7 @@ export const sessionService = {
           phone
         )
       `)
-      .gte('session_date', now) // Compara com a string ISO UTC
+      .gte('session_date', now)
       .order('session_date', { ascending: true })
 
     if (error) {
@@ -132,7 +153,7 @@ export const sessionService = {
 
   /**
    * Cria uma nova sessão no banco de dados.
-   * Garante que a 'session_date' seja convertida para UTC antes de ser salva.
+   * Garante que a 'session_date' seja salva como horário local.
    * @param session O objeto Session (sem 'id', 'created_at', 'user_id').
    * @returns Uma Promise que resolve para o objeto Session criado.
    * @throws Erro se a criação falhar.
@@ -140,11 +161,10 @@ export const sessionService = {
   async createSession(session: Omit<Session, 'id' | 'created_at' | 'user_id'>): Promise<Session> {
     const sessionData = {
       ...session,
-      // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar.
-      // Assume que session.session_date pode vir como string (já formatada) ou Date.
+      // Converte a data da sessão para string ISO local antes de salvar
       session_date: typeof session.session_date === 'string' 
-        ? session.session_date 
-        : toISOStringUTC(new Date(session.session_date))
+        ? toLocalISOString(parseLocalDate(session.session_date))
+        : toLocalISOString(new Date(session.session_date))
     }
     
     const { data, error } = await supabase
@@ -170,7 +190,7 @@ export const sessionService = {
 
   /**
    * Atualiza uma sessão existente no banco de dados.
-   * Garante que a 'session_date' (se fornecida) seja convertida para UTC antes de ser salva.
+   * Garante que a 'session_date' (se fornecida) seja salva como horário local.
    * @param id O ID da sessão a ser atualizada.
    * @param updates Um objeto com os campos a serem atualizados.
    * @returns Uma Promise que resolve para o objeto Session atualizado.
@@ -179,10 +199,10 @@ export const sessionService = {
   async updateSession(id: string, updates: Partial<Session>): Promise<Session> {
     const updateData = { ...updates }
     if (updateData.session_date) {
-      // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar, se a data for atualizada.
+      // Converte a data da sessão para string ISO local antes de salvar
       updateData.session_date = typeof updateData.session_date === 'string' 
-        ? updateData.session_date 
-        : toISOStringUTC(new Date(updateData.session_date))
+        ? toLocalISOString(parseLocalDate(updateData.session_date))
+        : toLocalISOString(new Date(updateData.session_date))
     }
     
     const { data, error } = await supabase
@@ -227,7 +247,7 @@ export const sessionService = {
   /**
    * Cria múltiplas sessões recorrentes para um paciente.
    * Calcula as datas das sessões com base nos agendamentos e número de semanas,
-   * garantindo que as datas sejam salvas em UTC.
+   * garantindo que as datas sejam salvas como horário local.
    * @param patientId O ID do paciente.
    * @param schedules Um array de objetos com o dia da semana (0=Dom, 6=Sáb), hora e status de pagamento.
    * @param weeksToCreate O número de semanas para criar sessões (padrão: 12).
@@ -241,11 +261,9 @@ export const sessionService = {
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    // Obtém a data e hora atual no fuso horário local do ambiente.
-    // Zera as horas, minutos, segundos e milissegundos para ter um ponto de partida limpo
-    // que representa o INÍCIO do dia atual no fuso horário local.
-    const nowLocal = new Date();
-    nowLocal.setHours(0, 0, 0, 0); 
+    // Obtém a data atual local e zera as horas para ter um ponto de partida limpo
+    const nowLocal = new Date()
+    nowLocal.setHours(0, 0, 0, 0)
     
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
@@ -256,43 +274,36 @@ export const sessionService = {
     
     for (let week = 0; week < weeksToCreate; week++) {
       for (const schedule of schedules) {
-        // 1. Começar com uma cópia do 'nowLocal' para cada sessão, garantindo que
-        // a base seja o início do dia atual no fuso horário local.
-        let sessionDateLocal = new Date(nowLocal);
+        // 1. Começar com uma cópia da data atual local
+        let sessionDateLocal = new Date(nowLocal)
         
-        // 2. Adicionar as semanas à data base.
-        sessionDateLocal.setDate(sessionDateLocal.getDate() + (week * 7));
+        // 2. Adicionar as semanas à data base
+        sessionDateLocal.setDate(sessionDateLocal.getDate() + (week * 7))
         
-        // 3. Ajustar para o dia da semana correto.
-        // getDay() retorna o dia da semana local (0 para domingo, 6 para sábado).
-        const currentDayOfWeek = sessionDateLocal.getDay();
-        const targetDayOfWeek = schedule.dayOfWeek;
+        // 3. Ajustar para o dia da semana correto
+        const currentDayOfWeek = sessionDateLocal.getDay()
+        const targetDayOfWeek = schedule.dayOfWeek
         
-        let daysToAdd = targetDayOfWeek - currentDayOfWeek;
-        // Se o dia da semana desejado já passou na semana atual,
-        // adiciona 7 dias para ir para a próxima ocorrência desse dia.
+        let daysToAdd = targetDayOfWeek - currentDayOfWeek
         if (daysToAdd < 0) {
-          daysToAdd += 7;
+          daysToAdd += 7
         }
         
-        sessionDateLocal.setDate(sessionDateLocal.getDate() + daysToAdd);
+        sessionDateLocal.setDate(sessionDateLocal.getDate() + daysToAdd)
         
-        // 4. Definir o horário específico (horas e minutos) no objeto Date local.
-        const [hours, minutes] = schedule.time.split(':').map(Number);
-        sessionDateLocal.setHours(hours, minutes, 0, 0); 
+        // 4. Definir o horário específico (horas e minutos)
+        const [hours, minutes] = schedule.time.split(':').map(Number)
+        sessionDateLocal.setHours(hours, minutes, 0, 0)
         
-        // 5. Pular sessões que já passaram.
-        // Compara a data e hora da sessão (local) com o início do dia atual (local).
-        // Isso evita agendar sessões no passado na primeira "rodada" de agendamentos.
-        if (sessionDateLocal < nowLocal) {
-          continue;
+        // 5. Pular sessões que já passaram
+        if (sessionDateLocal < new Date()) {
+          continue
         }
         
         sessions.push({
           patient_id: patientId,
-          // 6. Converte a data e hora final (que está no fuso horário local) para UTC
-          // antes de enviar para o banco de dados.
-          session_date: toISOStringUTC(sessionDateLocal),
+          // 6. Converte a data final para string ISO local
+          session_date: toLocalISOString(sessionDateLocal),
           duration_minutes: 50,
           session_type: 'Sessão Individual',
           session_price: patient?.session_price || null,
