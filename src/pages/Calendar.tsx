@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
 import { patientService } from '../services/patientService'
-import { Session, Patient } from '../types'
+import { Patient } from '../types'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, getDay, setHours, setMinutes, startOfDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 

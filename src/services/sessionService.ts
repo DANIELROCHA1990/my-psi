@@ -1,7 +1,5 @@
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
-import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 
 /**
  * 🔧 Utilitário: Converte um objeto Date para uma string no formato ISO sem timezone (YYYY-MM-DDTHH:mm:ss)
