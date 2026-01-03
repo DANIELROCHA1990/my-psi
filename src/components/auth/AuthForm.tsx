@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 import { authService } from '../../services/authService'
-import { Brain, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Brain, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [connectionError, setConnectionError] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -15,6 +16,7 @@ export default function AuthForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setConnectionError(false)
 
     try {
       if (isLogin) {
@@ -27,7 +29,21 @@ export default function AuthForm() {
         toast.success('Conta criada com sucesso!')
       }
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao autenticar')
+      console.error('Authentication error:', error)
+
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        setConnectionError(true)
+        toast.error(
+          'Não foi possível conectar ao servidor. Verifique as instruções abaixo.',
+          { duration: 6000 }
+        )
+      } else if (error.message?.includes('Invalid login credentials')) {
+        toast.error('Email ou senha incorretos')
+      } else if (error.message?.includes('Email not confirmed')) {
+        toast.error('Por favor, confirme seu email antes de fazer login')
+      } else {
+        toast.error(error.message || 'Erro ao autenticar')
+      }
     } finally {
       setLoading(false)
     }
@@ -44,7 +60,17 @@ export default function AuthForm() {
       if (error) throw error
       toast.success('Email de recuperação enviado!')
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao enviar email')
+      console.error('Password reset error:', error)
+
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        setConnectionError(true)
+        toast.error(
+          'Não foi possível conectar ao servidor. Verifique as instruções abaixo.',
+          { duration: 6000 }
+        )
+      } else {
+        toast.error(error.message || 'Erro ao enviar email')
+      }
     }
   }
 
@@ -64,6 +90,29 @@ export default function AuthForm() {
             Sistema de Gerenciamento de Pacientes
           </p>
         </div>
+
+        {connectionError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-red-800 mb-2">
+                  Não foi possível conectar ao Supabase
+                </h3>
+                <div className="text-sm text-red-700 space-y-2">
+                  <p>Seu projeto Supabase pode estar pausado. Siga estes passos:</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-2">
+                    <li>Acesse <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline font-medium">supabase.com/dashboard</a></li>
+                    <li>Encontre o projeto: <span className="font-mono text-xs">orwsjweeyqlcmfiafhex</span></li>
+                    <li>Se estiver pausado, clique em "Restore" ou "Unpause"</li>
+                    <li>Aguarde alguns minutos até o projeto estar ativo</li>
+                    <li>Tente fazer login novamente</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white py-8 px-6 shadow-lg rounded-lg border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
