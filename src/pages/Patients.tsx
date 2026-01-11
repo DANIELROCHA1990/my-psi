@@ -342,14 +342,14 @@ export default function Patients() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Pacientes</h1>
           <p className="text-gray-600 mt-2">Gerencie seus pacientes e suas informações.</p>
         </div>
         <button
           onClick={() => { setReactivateMode(false); setShowAddForm(true) }}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+          className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
         >
           <Plus className="h-5 w-5" />
           Novo Paciente
@@ -427,12 +427,12 @@ export default function Patients() {
           <div className="divide-y divide-gray-200">
             {filteredPatients.map((patient) => (
               <div key={patient.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start sm:items-center gap-4 min-w-0">
                     <div className="bg-emerald-100 rounded-full p-3">
                       <User className="h-6 w-6 text-emerald-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
                         {patient.full_name}
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -443,7 +443,7 @@ export default function Patients() {
                           {patient.active ? 'Ativo' : 'Inativo'}
                         </span>
                       </h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mt-1">
                         {patient.email && (
                           <div className="flex items-center gap-1">
                             <Mail className="h-4 w-4" />
@@ -471,7 +471,7 @@ export default function Patients() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                     <button
                       onClick={() => { setReactivateMode(false); setEditingPatient(patient) }}
                       className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -706,7 +706,7 @@ function PatientModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             {patient ? 'Editar Paciente' : 'Novo Paciente'}
@@ -964,7 +964,7 @@ function PatientModal({
                 />
               </div>
               <div className="md:col-span-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900">Renovacao automatica</h4>
                     <p className="text-sm text-gray-600">
@@ -987,7 +987,7 @@ function PatientModal({
           
           {/* Automatic Session Creation */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">
                 {isNewPatient ? 'Criação Automática de Sessões' : 'Atualizar Sessões Automáticas'}
               </h3>

@@ -304,24 +304,24 @@ export default function Financial() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Financeiro</h1>
           <p className="text-gray-600 mt-2">Controle suas receitas e despesas.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <a
             href="https://cav.receita.fazenda.gov.br/autenticacao/login"
             target="_blank"
             rel="noreferrer"
-            className="border border-emerald-200 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-50 transition-colors flex items-center gap-2"
+            className="border border-emerald-200 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <FileText className="h-5 w-5" />
             Gerar Recibo
           </a>
           <button
             onClick={() => setShowAddForm(true)}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <Plus className="h-5 w-5" />
             Nova Transação
@@ -393,7 +393,7 @@ export default function Financial() {
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Filtros e insights</h3>
             <button
               onClick={resetFilters}
@@ -700,8 +700,8 @@ export default function Financial() {
           <div className="divide-y divide-gray-200">
             {filteredRecords.map((record) => (
               <div key={record.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start sm:items-center gap-4 min-w-0">
                     <div className={`p-3 rounded-full ${
                       record.transaction_type === 'income' 
                         ? 'bg-green-50' 
@@ -713,11 +713,11 @@ export default function Financial() {
                           : 'text-red-600'
                       }`} />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-medium text-gray-900">
                         {record.patients?.full_name || record.description}
                       </h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                         <span>{format(parseISO(record.transaction_date), 'dd/MM/yyyy')}</span>
                         <span className="capitalize">{record.payment_method}</span>
                         {record.category && <span>{record.category}</span>}
@@ -725,8 +725,8 @@ export default function Financial() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto sm:justify-end">
+                    <div className="sm:text-right">
                       <p className={`text-lg font-semibold ${
                         record.transaction_type === 'income' 
                           ? 'text-green-600' 
@@ -878,7 +878,7 @@ function FinancialModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             {record ? 'Editar Transação' : 'Nova Transação'}
