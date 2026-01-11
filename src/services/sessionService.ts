@@ -2,8 +2,8 @@
 
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
-import { addWeeks, format, setHours, setMinutes, startOfWeek, addDays, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { addDays, addWeeks } from 'date-fns'
+import { notificationService } from './notificationService'
 
 /**
  * 🔧 Utilitário: Converte um objeto Date (que é sempre no fuso horário local do ambiente)
@@ -165,6 +165,12 @@ export const sessionService = {
       throw new Error(`Failed to create session: ${error.message}`)
     }
 
+    try {
+      await notificationService.ensureSessionNotifications([data])
+    } catch (integrationError) {
+      console.error('Error integrating session with notifications:', integrationError)
+    }
+
     return data
   },
 
@@ -202,6 +208,12 @@ export const sessionService = {
 
     if (error) {
       throw new Error(`Failed to update session: ${error.message}`)
+    }
+
+    try {
+      await notificationService.ensureSessionNotifications([data], { updateExisting: true })
+    } catch (integrationError) {
+      console.error('Error integrating updated session with notifications:', integrationError)
     }
 
     return data
@@ -242,11 +254,8 @@ export const sessionService = {
     const sessions: any[] = []
     
     // Obtém a data e hora atual no fuso horário local do ambiente.
-    // Zera as horas, minutos, segundos e milissegundos para ter um ponto de partida limpo
-    // que representa o INÍCIO do dia atual no fuso horário local.
     const nowLocal = new Date();
-    nowLocal.setHours(0, 0, 0, 0); 
-    
+
     // Buscar dados do paciente para pegar o preço da sessão
     const { data: patient } = await supabase
       .from('patients')
@@ -254,43 +263,28 @@ export const sessionService = {
       .eq('id', patientId)
       .single()
     
-    for (let week = 0; week < weeksToCreate; week++) {
-      for (const schedule of schedules) {
-        // 1. Começar com uma cópia do 'nowLocal' para cada sessão, garantindo que
-        // a base seja o início do dia atual no fuso horário local.
-        let sessionDateLocal = new Date(nowLocal);
-        
-        // 2. Adicionar as semanas à data base.
-        sessionDateLocal.setDate(sessionDateLocal.getDate() + (week * 7));
-        
-        // 3. Ajustar para o dia da semana correto.
-        // getDay() retorna o dia da semana local (0 para domingo, 6 para sábado).
-        const currentDayOfWeek = sessionDateLocal.getDay();
-        const targetDayOfWeek = schedule.dayOfWeek;
-        
-        let daysToAdd = targetDayOfWeek - currentDayOfWeek;
-        // Se o dia da semana desejado já passou na semana atual,
-        // adiciona 7 dias para ir para a próxima ocorrência desse dia.
-        if (daysToAdd < 0) {
-          daysToAdd += 7;
-        }
-        
-        sessionDateLocal.setDate(sessionDateLocal.getDate() + daysToAdd);
-        
-        // 4. Definir o horário específico (horas e minutos) no objeto Date local.
-        const [hours, minutes] = schedule.time.split(':').map(Number);
-        sessionDateLocal.setHours(hours, minutes, 0, 0); 
-        
-        // 5. Pular sessões que já passaram.
-        // Compara a data e hora da sessão (local) com o início do dia atual (local).
-        // Isso evita agendar sessões no passado na primeira "rodada" de agendamentos.
-        if (sessionDateLocal < nowLocal) {
-          continue;
-        }
-        
+    for (const schedule of schedules) {
+      const [hours, minutes] = schedule.time.split(':').map(Number)
+      const baseDate = new Date(nowLocal)
+      baseDate.setHours(hours, minutes, 0, 0)
+
+      const currentDay = baseDate.getDay()
+      let daysToAdd = schedule.dayOfWeek - currentDay
+      if (daysToAdd < 0) {
+        daysToAdd += 7
+      }
+      if (daysToAdd === 0 && baseDate < nowLocal) {
+        daysToAdd = 7
+      }
+
+      const firstSessionDateLocal = addDays(baseDate, daysToAdd)
+
+      for (let week = 0; week < weeksToCreate; week++) {
+        const sessionDateLocal = addWeeks(firstSessionDateLocal, week)
+
         sessions.push({
           patient_id: patientId,
-          // 6. Converte a data e hora final (que está no fuso horário local) para UTC
+          // Converte a data e hora final (que está no fuso horário local) para UTC
           // antes de enviar para o banco de dados.
           session_date: toISOStringUTC(sessionDateLocal),
           duration_minutes: 50,
@@ -323,7 +317,41 @@ export const sessionService = {
     if (error) {
       throw new Error(`Failed to create multiple sessions: ${error.message}`)
     }
+
+    if (data?.length) {
+      try {
+        await notificationService.ensureSessionNotifications(data)
+      } catch (integrationError) {
+        console.error('Error integrating sessions with notifications:', integrationError)
+      }
+    }
     
     return data || []
+  },
+  /**
+   * Substitui sessões futuras (não pagas) de um paciente por novas sessões automáticas.
+   * @param patientId O ID do paciente.
+   * @param schedules Um array de agendamentos recorrentes.
+   * @param weeksToCreate O número de semanas para recriar sessões.
+   */
+  async replaceFutureSessions(
+    patientId: string,
+    schedules: Array<{dayOfWeek: number, time: string, paymentStatus: string}>,
+    weeksToCreate: number = 12
+  ): Promise<Session[]> {
+    const now = new Date().toISOString()
+
+    const { error: deleteError } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('patient_id', patientId)
+      .gte('session_date', now)
+      .neq('payment_status', 'paid')
+
+    if (deleteError) {
+      throw new Error(`Failed to replace sessions: ${deleteError.message}`)
+    }
+
+    return this.createMultipleSessions(patientId, schedules, weeksToCreate)
   }
 }

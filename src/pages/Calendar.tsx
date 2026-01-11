@@ -1,15 +1,15 @@
-// Calendar.tsx
+﻿// Calendar.tsx
 
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
 import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 
-// 🔧 Utilitário: Garante que todas as datas sejam interpretadas como UTC.
+// Utilitario: Garante que todas as datas sejam interpretadas como UTC.
 // Se a string já tem 'Z', parseISO a trata como UTC.
 // Se não tem 'Z', mas sabemos que o backend envia UTC, podemos adicionar 'Z' para forçar a interpretação.
 // No entanto, com a correção no SessionService, as datas do backend SEMPRE terão 'Z'.
@@ -51,9 +51,11 @@ export default function Calendar() {
     }
   }
 
-  const monthStart = startOfMonth(currentDate) // Objeto Date local
+  const monthStart = startOfMonth(currentDate) // currentDate e um objeto Date local
   const monthEnd = endOfMonth(currentDate)     // Objeto Date local
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd }) // Array de objetos Date locais (meia-noite)
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+  const monthDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd }) // Array de objetos Date locais (meia-noite)
 
   const getSessionsForDate = (date: Date) => { // 'date' é um objeto Date local (meia-noite)
     return sessions.filter(session => {
@@ -85,7 +87,7 @@ export default function Calendar() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     )
   }
@@ -147,12 +149,12 @@ export default function Calendar() {
                       onClick={() => handleDateClick(day)}
                       className={`
                         relative p-2 h-20 text-left border border-gray-100 hover:bg-gray-50 transition-colors
-                        ${isSelected ? 'bg-blue-50 border-blue-200' : ''}
+                        ${isSelected ? 'bg-emerald-50 border-emerald-200' : ''}
                         ${!isCurrentMonth ? 'text-gray-400' : ''}
                       `}
                     >
                       <span className={`text-sm font-medium ${
-                        isSameDay(day, new Date()) ? 'text-blue-600' : ''
+                        isSameDay(day, new Date()) ? 'text-emerald-600' : ''
                       }`}>
                         {format(day, 'd')}
                       </span>
@@ -269,3 +271,6 @@ export default function Calendar() {
     </div>
   )
 }
+
+
+

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
 import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
-import { Plus, Search, Edit, Trash2, Calendar, Clock, User, DollarSign, FileText } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Calendar, Clock, User, DollarSign } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -66,7 +66,7 @@ export default function Sessions() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     )
   }
@@ -81,7 +81,7 @@ export default function Sessions() {
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+          className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
         >
           <Plus className="h-5 w-5" />
           Nova Sessão
@@ -92,8 +92,8 @@ export default function Sessions() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-600" />
+            <div className="bg-emerald-50 p-3 rounded-lg">
+              <Calendar className="h-6 w-6 text-emerald-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total de Sessões</p>
@@ -149,13 +149,13 @@ export default function Sessions() {
               placeholder="Buscar sessões..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           >
             <option value="all">Todos os Status</option>
             <option value="pending">Pendente</option>
@@ -229,7 +229,7 @@ export default function Sessions() {
                   <div className="flex items-center gap-2 ml-4">
                     <button
                       onClick={() => setEditingSession(session)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                       title="Editar sessão"
                     >
                       <Edit className="h-4 w-4" />
@@ -263,7 +263,7 @@ export default function Sessions() {
             {!searchTerm && filterStatus === 'all' && (
               <button
                 onClick={() => setShowAddForm(true)}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
                 Agendar Primeira Sessão
               </button>
@@ -399,7 +399,7 @@ function SessionModal({
                   required
                   value={formData.patient_id}
                   onChange={(e) => handlePatientChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="">Selecione um paciente</option>
                   {patients.filter(p => p.active).map(patient => (
@@ -419,7 +419,7 @@ function SessionModal({
                   required
                   value={formData.session_date}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -432,7 +432,7 @@ function SessionModal({
                   min="1"
                   value={formData.duration_minutes}
                   onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -443,7 +443,7 @@ function SessionModal({
                 <select
                   value={formData.session_type}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="Sessão Individual">Sessão Individual</option>
                   <option value="Sessão em Grupo">Sessão em Grupo</option>
@@ -463,7 +463,7 @@ function SessionModal({
                   min="0"
                   value={formData.session_price}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_price: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder={selectedPatient ? `Valor padrão: R$ ${selectedPatient.session_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}` : 'Digite o valor'}
                 />
               </div>
@@ -475,7 +475,7 @@ function SessionModal({
                 <select
                   value={formData.payment_status}
                   onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="pending">Pendente</option>
                   <option value="paid">Pago</option>
@@ -497,7 +497,7 @@ function SessionModal({
                   rows={4}
                   value={formData.summary}
                   onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Resumo dos principais pontos abordados na sessão..."
                 />
               </div>
@@ -510,7 +510,7 @@ function SessionModal({
                   rows={3}
                   value={formData.session_notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_notes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Observações e anotações importantes..."
                 />
               </div>
@@ -524,7 +524,7 @@ function SessionModal({
                     type="text"
                     value={formData.mood_before}
                     onChange={(e) => setFormData(prev => ({ ...prev, mood_before: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Ex: Ansioso, Calmo, Irritado..."
                   />
                 </div>
@@ -537,7 +537,7 @@ function SessionModal({
                     type="text"
                     value={formData.mood_after}
                     onChange={(e) => setFormData(prev => ({ ...prev, mood_after: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Ex: Mais calmo, Reflexivo, Motivado..."
                   />
                 </div>
@@ -551,7 +551,7 @@ function SessionModal({
                   rows={2}
                   value={formData.homework_assigned}
                   onChange={(e) => setFormData(prev => ({ ...prev, homework_assigned: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Exercícios ou tarefas para realizar até a próxima sessão..."
                 />
               </div>
@@ -564,7 +564,7 @@ function SessionModal({
                   type="datetime-local"
                   value={formData.next_session_date}
                   onChange={(e) => setFormData(prev => ({ ...prev, next_session_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -581,7 +581,7 @@ function SessionModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
               {loading ? 'Salvando...' : (session ? 'Atualizar' : 'Criar')}
             </button>
@@ -591,3 +591,4 @@ function SessionModal({
     </div>
   )
 }
+

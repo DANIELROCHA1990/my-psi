@@ -88,21 +88,6 @@ export interface FinancialRecord {
   sessions?: Session
 }
 
-export interface Receipt {
-  id: string
-  user_id: string
-  patient_id: string
-  session_id: string
-  receipt_number: string
-  amount: number
-  issue_date: string
-  status: string
-  receipt_type: string
-  created_at?: string
-  patients?: Patient
-  sessions?: Session
-}
-
 export interface Notification {
   id: string
   user_id: string

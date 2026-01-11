@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { Patient } from '../types'
@@ -56,7 +56,7 @@ export default function Patients() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     )
   }
@@ -71,7 +71,7 @@ export default function Patients() {
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+          className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
         >
           <Plus className="h-5 w-5" />
           Novo Paciente
@@ -82,8 +82,8 @@ export default function Patients() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <User className="h-6 w-6 text-blue-600" />
+            <div className="bg-emerald-50 p-3 rounded-lg">
+              <User className="h-6 w-6 text-emerald-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total de Pacientes</p>
@@ -132,7 +132,7 @@ export default function Patients() {
             placeholder="Buscar pacientes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
         </div>
       </div>
@@ -151,8 +151,8 @@ export default function Patients() {
               <div key={patient.id} className="p-6 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="bg-blue-100 rounded-full p-3">
-                      <User className="h-6 w-6 text-blue-600" />
+                    <div className="bg-emerald-100 rounded-full p-3">
+                      <User className="h-6 w-6 text-emerald-600" />
                     </div>
                     <div>
                       <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -196,7 +196,7 @@ export default function Patients() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setEditingPatient(patient)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                       title="Editar paciente"
                     >
                       <Edit className="h-4 w-4" />
@@ -230,7 +230,7 @@ export default function Patients() {
             {!searchTerm && (
               <button
                 onClick={() => setShowAddForm(true)}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
                 Cadastrar Primeiro Paciente
               </button>
@@ -294,7 +294,8 @@ function PatientModal({
     paymentStatus: 'paid' | 'pending'
   }>>([])
   
-  const [createSessions, setCreateSessions] = useState(!patient) // Só para novos pacientes
+  const isNewPatient = !patient
+  const [manageAutoSessions, setManageAutoSessions] = useState(isNewPatient)
   const [loading, setLoading] = useState(false)
   
   const daysOfWeek = [
@@ -357,13 +358,27 @@ function PatientModal({
       if (patient) {
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
-        toast.success('Paciente atualizado com sucesso')
+
+        if (manageAutoSessions && sessionSchedules.length > 0) {
+          try {
+            await sessionService.replaceFutureSessions(
+              patient.id,
+              sessionSchedules,
+              12
+            )
+            toast.success('Paciente e sessões atualizados com sucesso')
+          } catch (sessionError) {
+            toast.error('Paciente atualizado, mas erro ao atualizar sessões')
+          }
+        } else {
+          toast.success('Paciente atualizado com sucesso')
+        }
       } else {
         const { data: newPatient, error } = await patientService.createPatient(patientData as any)
         if (error) throw error
         
         // Se deve criar sessões automaticamente
-        if (createSessions && sessionSchedules.length > 0) {
+        if (manageAutoSessions && sessionSchedules.length > 0) {
           try {
             await sessionService.createMultipleSessions(
               newPatient?.id || '',
@@ -410,7 +425,7 @@ function PatientModal({
                   required
                   value={formData.full_name}
                   onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -422,7 +437,7 @@ function PatientModal({
                   type="date"
                   value={formData.birth_date}
                   onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -434,7 +449,7 @@ function PatientModal({
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -446,7 +461,7 @@ function PatientModal({
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -458,7 +473,7 @@ function PatientModal({
                   type="text"
                   value={formData.cpf}
                   onChange={(e) => setFormData(prev => ({ ...prev, cpf: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="000.000.000-00"
                 />
               </div>
@@ -470,7 +485,7 @@ function PatientModal({
                 <select
                   value={formData.active ? 'true' : 'false'}
                   onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.value === 'true' }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="true">Ativo</option>
                   <option value="false">Inativo</option>
@@ -491,7 +506,7 @@ function PatientModal({
                   rows={2}
                   value={formData.address}
                   onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Rua, número, complemento..."
                 />
               </div>
@@ -504,7 +519,7 @@ function PatientModal({
                   type="text"
                   value={formData.city}
                   onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -516,7 +531,7 @@ function PatientModal({
                   type="text"
                   value={formData.state}
                   onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Ex: SP, RJ, MG..."
                 />
               </div>
@@ -529,7 +544,7 @@ function PatientModal({
                   type="text"
                   value={formData.zip_code}
                   onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="00000-000"
                 />
               </div>
@@ -548,7 +563,7 @@ function PatientModal({
                   type="text"
                   value={formData.emergency_contact}
                   onChange={(e) => setFormData(prev => ({ ...prev, emergency_contact: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -560,7 +575,7 @@ function PatientModal({
                   type="tel"
                   value={formData.emergency_phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, emergency_phone: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -578,7 +593,7 @@ function PatientModal({
                   rows={3}
                   value={formData.medical_history}
                   onChange={(e) => setFormData(prev => ({ ...prev, medical_history: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Histórico médico relevante..."
                 />
               </div>
@@ -591,7 +606,7 @@ function PatientModal({
                   rows={2}
                   value={formData.current_medications}
                   onChange={(e) => setFormData(prev => ({ ...prev, current_medications: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Medicações em uso..."
                 />
               </div>
@@ -604,7 +619,7 @@ function PatientModal({
                   rows={3}
                   value={formData.therapy_goals}
                   onChange={(e) => setFormData(prev => ({ ...prev, therapy_goals: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Objetivos e metas da terapia..."
                 />
               </div>
@@ -622,7 +637,7 @@ function PatientModal({
                 <select
                   value={formData.session_frequency}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_frequency: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="weekly">Semanal</option>
                   <option value="biweekly">Quinzenal</option>
@@ -642,104 +657,106 @@ function PatientModal({
                   required
                   value={formData.session_price}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_price: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Valor que será usado em todas as sessões"
                 />
               </div>
             </div>
           </div>
           
-          {/* Automatic Session Creation - Only for new patients */}
-          {!patient && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Criação Automática de Sessões</h3>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createSessions}
-                    onChange={(e) => setCreateSessions(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              
-              {createSessions && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Configure os dias e horários das sessões. Serão criadas automaticamente sessões para as próximas 12 semanas.
-                  </p>
-                  
-                  {sessionSchedules.map((schedule, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Dia da Semana
-                        </label>
-                        <select
-                          value={schedule.dayOfWeek}
-                          onChange={(e) => updateSchedule(index, 'dayOfWeek', Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          {daysOfWeek.map(day => (
-                            <option key={day.value} value={day.value}>
-                              {day.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Horário
-                        </label>
-                        <input
-                          type="time"
-                          value={schedule.time}
-                          onChange={(e) => updateSchedule(index, 'time', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Status de Pagamento
-                        </label>
-                        <select
-                          value={schedule.paymentStatus}
-                          onChange={(e) => updateSchedule(index, 'paymentStatus', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          <option value="pending">Pendente</option>
-                          <option value="paid">Pago</option>
-                        </select>
-                      </div>
-                      
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => removeSchedule(index)}
-                          className="w-full px-3 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={addSchedule}
-                    className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Clock className="h-4 w-4" />
-                    Adicionar Horário de Sessão
-                  </button>
-                </div>
-              )}
+          {/* Automatic Session Creation */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                {isNewPatient ? 'Criação Automática de Sessões' : 'Atualizar Sessões Automáticas'}
+              </h3>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={manageAutoSessions}
+                  onChange={(e) => setManageAutoSessions(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
             </div>
-          )}
+            
+            {manageAutoSessions && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  {isNewPatient
+                    ? 'Configure os dias e horários das sessões. Serão criadas automaticamente sessões para as próximas 12 semanas.'
+                    : 'Ao salvar, as sessões futuras não pagas deste paciente serão substituídas pelas novas datas (12 semanas).'}
+                </p>
+                
+                {sessionSchedules.map((schedule, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Dia da Semana
+                      </label>
+                      <select
+                        value={schedule.dayOfWeek}
+                        onChange={(e) => updateSchedule(index, 'dayOfWeek', Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      >
+                        {daysOfWeek.map(day => (
+                          <option key={day.value} value={day.value}>
+                            {day.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Horário
+                      </label>
+                      <input
+                        type="time"
+                        value={schedule.time}
+                        onChange={(e) => updateSchedule(index, 'time', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Status de Pagamento
+                      </label>
+                      <select
+                        value={schedule.paymentStatus}
+                        onChange={(e) => updateSchedule(index, 'paymentStatus', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      >
+                        <option value="pending">Pendente</option>
+                        <option value="paid">Pago</option>
+                      </select>
+                    </div>
+                    
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => removeSchedule(index)}
+                        className="w-full px-3 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={addSchedule}
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  Adicionar Horário de Sessão
+                </button>
+              </div>
+            )}
+          </div>
           
           <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
             <button
@@ -752,7 +769,7 @@ function PatientModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
               {loading ? 'Salvando...' : (patient ? 'Atualizar' : 'Criar')}
             </button>
@@ -762,3 +779,4 @@ function PatientModal({
     </div>
   )
 }
+

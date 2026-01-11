@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
@@ -69,7 +69,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     )
   }
@@ -88,8 +88,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-blue-600" />
+            <div className="bg-emerald-50 p-3 rounded-lg">
+              <Users className="h-6 w-6 text-emerald-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pacientes Ativos</p>
@@ -240,10 +240,10 @@ export default function Dashboard() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Ações Rápidas</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group">
+          <button className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-colors group">
             <div className="text-center">
-              <Users className="h-8 w-8 text-gray-400 group-hover:text-blue-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600 group-hover:text-blue-600">
+              <Users className="h-8 w-8 text-gray-400 group-hover:text-emerald-500 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-600 group-hover:text-emerald-600">
                 Novo Paciente
               </p>
             </div>
@@ -271,3 +271,4 @@ export default function Dashboard() {
     </div>
   )
 }
+

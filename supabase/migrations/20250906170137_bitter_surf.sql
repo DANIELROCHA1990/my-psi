@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   patient_id uuid NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
-  session_id uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  session_id uuid NOT NULL,
   receipt_number text UNIQUE NOT NULL,
   amount numeric(10,2) NOT NULL,
   issue_date date NOT NULL DEFAULT CURRENT_DATE,

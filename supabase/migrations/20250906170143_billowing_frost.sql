@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   patient_id uuid REFERENCES patients(id) ON DELETE CASCADE,
-  session_id uuid REFERENCES sessions(id) ON DELETE CASCADE,
+  session_id uuid,
   notification_type text NOT NULL,
   title text NOT NULL,
   message text NOT NULL,

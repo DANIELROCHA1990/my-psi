@@ -111,3 +111,30 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_patient_id ON sessions(patient_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(session_date);
 CREATE INDEX IF NOT EXISTS idx_sessions_payment_status ON sessions(payment_status);
+
+DO $$
+BEGIN
+  IF to_regclass('public.receipts') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'receipts_session_id_fkey'
+        AND conrelid = 'public.receipts'::regclass
+    ) THEN
+      ALTER TABLE public.receipts
+        ADD CONSTRAINT receipts_session_id_fkey
+        FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+
+  IF to_regclass('public.notifications') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'notifications_session_id_fkey'
+        AND conrelid = 'public.notifications'::regclass
+    ) THEN
+      ALTER TABLE public.notifications
+        ADD CONSTRAINT notifications_session_id_fkey
+        FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+END $$;

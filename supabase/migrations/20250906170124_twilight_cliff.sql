@@ -14,6 +14,11 @@
 -- Add missing columns to financial_records table
 DO $$
 BEGIN
+  IF to_regclass('public.financial_records') IS NULL THEN
+    RAISE NOTICE 'Skipping financial_records updates because table does not exist';
+    RETURN;
+  END IF;
+
   -- Add user_id column if it doesn't exist
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -76,38 +81,37 @@ BEGIN
   ) THEN
     ALTER TABLE financial_records RENAME COLUMN payment_date TO transaction_date;
   END IF;
+  -- Ensure RLS is enabled
+  ALTER TABLE financial_records ENABLE ROW LEVEL SECURITY;
+
+  -- Drop existing policies if they exist
+  DROP POLICY IF EXISTS "Users can read own financial records" ON financial_records;
+  DROP POLICY IF EXISTS "Users can insert own financial records" ON financial_records;
+  DROP POLICY IF EXISTS "Users can update own financial records" ON financial_records;
+  DROP POLICY IF EXISTS "Users can delete own financial records" ON financial_records;
+
+  -- Create new policies
+  CREATE POLICY "Users can read own financial records"
+    ON financial_records
+    FOR SELECT
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+  CREATE POLICY "Users can insert own financial records"
+    ON financial_records
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = user_id);
+
+  CREATE POLICY "Users can update own financial records"
+    ON financial_records
+    FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+  CREATE POLICY "Users can delete own financial records"
+    ON financial_records
+    FOR DELETE
+    TO authenticated
+    USING (auth.uid() = user_id);
 END $$;
-
--- Ensure RLS is enabled
-ALTER TABLE financial_records ENABLE ROW LEVEL SECURITY;
-
--- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Users can read own financial records" ON financial_records;
-DROP POLICY IF EXISTS "Users can insert own financial records" ON financial_records;
-DROP POLICY IF EXISTS "Users can update own financial records" ON financial_records;
-DROP POLICY IF EXISTS "Users can delete own financial records" ON financial_records;
-
--- Create new policies
-CREATE POLICY "Users can read own financial records"
-  ON financial_records
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own financial records"
-  ON financial_records
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own financial records"
-  ON financial_records
-  FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own financial records"
-  ON financial_records
-  FOR DELETE
-  TO authenticated
-  USING (auth.uid() = user_id);

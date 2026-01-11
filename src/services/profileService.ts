@@ -6,7 +6,7 @@ export const profileService = {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('Error fetching profile:', error)
