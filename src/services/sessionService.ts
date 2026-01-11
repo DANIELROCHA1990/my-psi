@@ -54,6 +54,7 @@ const fetchSessions = async (): Promise<Session[]> => {
         full_name,
         email,
         phone,
+        session_link,
         active,
         session_frequency,
         session_price,
@@ -185,6 +186,7 @@ export const sessionService = {
           full_name,
           email,
           phone,
+          session_link,
           active,
           session_frequency,
           session_price,
@@ -225,6 +227,7 @@ export const sessionService = {
           city,
           state,
           zip_code,
+          session_link,
           emergency_contact,
           emergency_phone,
           medical_history,
@@ -273,7 +276,8 @@ export const sessionService = {
           id,
           full_name,
           email,
-          phone
+          phone,
+          session_link
         )
       `)
       .single()
@@ -310,7 +314,8 @@ export const sessionService = {
           id,
           full_name,
           email,
-          phone
+          phone,
+          session_link
         )
       `)
       .single()
@@ -442,7 +447,8 @@ export const sessionService = {
           id,
           full_name,
           email,
-          phone
+          phone,
+          session_link
         )
       `)
     
@@ -475,7 +481,8 @@ export const sessionService = {
           id,
           full_name,
           email,
-          phone
+          phone,
+          session_link
         )
       `)
 

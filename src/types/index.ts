@@ -42,6 +42,7 @@ export interface Patient {
   therapy_goals?: string
   session_frequency: string
   session_price?: number
+  session_link?: string | null
   auto_renew_sessions?: boolean
   session_schedules?: SessionSchedule[]
   active: boolean

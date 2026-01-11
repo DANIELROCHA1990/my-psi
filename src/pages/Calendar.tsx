@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
 import { Session } from '../types'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Edit } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Edit, ExternalLink } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -50,6 +50,20 @@ function formatSessionTypeLabel(value?: string): string {
   }
 
   return value
+}
+
+function normalizeSessionLink(link?: string | null): string | null {
+  if (!link) {
+    return null
+  }
+  const trimmed = link.trim()
+  if (!trimmed) {
+    return null
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+  return `https://${trimmed}`
 }
 
 function SessionEditModal({
@@ -354,6 +368,7 @@ export default function Calendar() {
     })
   }
 
+
   const handlePreviousMonth = () => {
     setCurrentDate(subMonths(currentDate, 1))
   }
@@ -488,7 +503,9 @@ export default function Calendar() {
               {selectedDate ? (
                 selectedDateSessions.length > 0 ? (
                   <div className="space-y-4">
-                    {selectedDateSessions.map(session => (
+                    {selectedDateSessions.map(session => {
+                      const sessionLink = normalizeSessionLink(session.patients?.session_link)
+                      return (
                       <div key={session.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -528,8 +545,20 @@ export default function Calendar() {
                           <span>{session.duration_minutes} min</span>
                         </div>
                         
-                        <div className="text-sm text-gray-600">
-                          {formatSessionTypeLabel(session.session_type)}
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <span>{formatSessionTypeLabel(session.session_type)}</span>
+                          {sessionLink && (
+                            <a
+                              href={sessionLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-600 hover:text-emerald-700"
+                              title="Abrir link do atendimento"
+                              aria-label="Abrir link do atendimento"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
                         </div>
                         
                         {session.session_price && (
@@ -538,7 +567,8 @@ export default function Calendar() {
                           </div>
                         )}
                       </div>
-                    ))}
+                    )
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">
