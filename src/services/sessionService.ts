@@ -1,17 +1,17 @@
-// MultipleFiles/SessionService.ts
+﻿// MultipleFiles/SessionService.ts
 
 import { supabase } from '../lib/supabase'
-import { Session } from '../types'
-import { addDays, addWeeks } from 'date-fns'
-import { notificationService } from './notificationService'
+import { Session, SessionSchedule } from '../types'
+import { addDays, addWeeks, parseISO, format } from 'date-fns'
+import { findSessionConflict } from '../lib/scheduling'
 
 /**
- * 🔧 Utilitário: Converte um objeto Date (que é sempre no fuso horário local do ambiente)
+ * ðŸ”§ UtilitÃírio: Converte um objeto Date (que Ã© sempre no fuso horÃírio local do ambiente)
  * para uma string ISO 8601 em UTC (com o 'Z' no final).
  *
  * Exemplo:
- * Se o fuso horário local é UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
- * este método retornará "2023-10-25T12:00:00.000Z".
+ * Se o fuso horÃírio local Ã© UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
+ * este mÃ©todo retornarÃí "2023-10-25T12:00:00.000Z".
  *
  * Isso garante que a data e hora agendadas localmente sejam corretamente
  * convertidas e armazenadas em um formato universal (UTC) no banco de dados.
@@ -20,46 +20,160 @@ import { notificationService } from './notificationService'
  * @returns Uma string ISO 8601 representando a data em UTC.
  */
 function toISOStringUTC(date: Date): string {
-  return date.toISOString();
+  return date.toISOString()
+}
+
+function hasTimezoneInfo(value: string): boolean {
+  return /Z$|[+-]\d{2}:?\d{2}$/.test(value)
+}
+
+function normalizeSessionDateValue(value: string | Date): string {
+  if (value instanceof Date) {
+    return toISOStringUTC(value)
+  }
+
+  if (hasTimezoneInfo(value)) {
+    return value
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return toISOStringUTC(parsed)
+}
+
+const fetchSessions = async (): Promise<Session[]> => {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      *,
+      patients (
+        id,
+        full_name,
+        email,
+        phone,
+        active,
+        session_frequency,
+        session_price,
+        auto_renew_sessions,
+        session_schedules
+      )
+    `)
+    .order('session_date', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to fetch sessions: ${error.message}`)
+  }
+
+  return data || []
+}
+
+const deriveSchedulesFromSessions = (sessions: Session[]): SessionSchedule[] => {
+  const scheduleMap = new Map<string, SessionSchedule>()
+  const sorted = [...sessions].sort(
+    (a, b) => parseISO(b.session_date).getTime() - parseISO(a.session_date).getTime()
+  )
+
+  sorted.forEach((session) => {
+    if (session.payment_status === 'cancelled') {
+      return
+    }
+
+    const sessionDate = parseISO(session.session_date)
+    const dayOfWeek = sessionDate.getDay()
+    const time = format(sessionDate, 'HH:mm')
+    const key = `${dayOfWeek}-${time}`
+
+    if (!scheduleMap.has(key)) {
+      scheduleMap.set(key, {
+        dayOfWeek,
+        time,
+        paymentStatus: 'pending',
+        sessionType: session.session_type || 'Sessao Individual',
+        durationMinutes: session.duration_minutes ?? 50,
+        sessionPrice: session.session_price ?? undefined
+      })
+    }
+  })
+
+  return Array.from(scheduleMap.values())
+}
+
+const autoRenewSessionsIfNeeded = async (sessions: Session[]) => {
+  const now = new Date()
+  const patientMap = new Map<string, { patient: Session['patients']; sessions: Session[]; hasFuture: boolean }>()
+
+  sessions.forEach((session) => {
+    const patient = session.patients
+    if (!patient?.auto_renew_sessions || patient.active === false) {
+      return
+    }
+
+    const entry = patientMap.get(session.patient_id) || {
+      patient,
+      sessions: [],
+      hasFuture: false
+    }
+
+    entry.sessions.push(session)
+
+    if (session.payment_status !== 'cancelled' && parseISO(session.session_date) > now) {
+      entry.hasFuture = true
+    }
+
+    patientMap.set(session.patient_id, entry)
+  })
+
+  const createdSessions: Session[] = []
+
+  for (const [patientId, entry] of patientMap.entries()) {
+    if (entry.hasFuture || entry.sessions.length === 0) {
+      continue
+    }
+
+    const storedSchedules = entry.patient?.session_schedules || []
+    const schedules = storedSchedules.length > 0 ? storedSchedules : deriveSchedulesFromSessions(entry.sessions)
+
+    if (!schedules.length) {
+      continue
+    }
+
+    const newSessions = await sessionService.createMultipleSessions(patientId, schedules, 12)
+    createdSessions.push(...newSessions)
+  }
+
+  return createdSessions
 }
 
 export const sessionService = {
   /**
-   * Busca todas as sessões do banco de dados, incluindo os dados do paciente associado.
-   * As sessões são ordenadas pela data da sessão em ordem decrescente.
+   * Busca todas as sessÃµes do banco de dados, incluindo os dados do paciente associado.
+   * As sessÃµes sÃúo ordenadas pela data da sessão em ordem decrescente.
    * @returns Uma Promise que resolve para um array de objetos Session.
    * @throws Erro se a busca falhar.
    */
   async getSessions(): Promise<Session[]> {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone
-        )
-      `)
-      .order('session_date', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to fetch sessions: ${error.message}`)
+    const data = await fetchSessions()
+    const renewedSessions = await autoRenewSessionsIfNeeded(data)
+    if (!renewedSessions.length) {
+      return data
     }
-
-    return data || []
+    return [...data, ...renewedSessions].sort(
+      (a, b) => parseISO(b.session_date).getTime() - parseISO(a.session_date).getTime()
+    )
   },
 
   /**
-   * Busca as próximas sessões (com data maior ou igual à data atual).
-   * As sessões são ordenadas pela data da sessão em ordem crescente.
-   * A comparação é feita em UTC para garantir consistência com o banco de dados.
+   * Busca as prÃ³ximas sessÃµes (com data maior ou igual Ãá data atual).
+   * As sessÃµes sÃúo ordenadas pela data da sessão em ordem crescente.
+   * A comparaÃ§Ãúo Ã© feita em UTC para garantir consistÃªncia com o banco de dados.
    * @returns Uma Promise que resolve para um array de objetos Session.
    * @throws Erro se a busca falhar.
    */
   async getUpcomingSessions(): Promise<Session[]> {
-    // Obtém a data e hora atual em UTC para comparação consistente com o banco de dados.
+    // ObtÃ©m a data e hora atual em UTC para comparaÃ§Ãúo consistente com o banco de dados.
     const now = new Date().toISOString();
     
     const { data, error } = await supabase
@@ -70,7 +184,12 @@ export const sessionService = {
           id,
           full_name,
           email,
-          phone
+          phone,
+          active,
+          session_frequency,
+          session_price,
+          auto_renew_sessions,
+          session_schedules
         )
       `)
       .gte('session_date', now) // Compara com a string ISO UTC
@@ -120,7 +239,7 @@ export const sessionService = {
       .single()
 
     if (error) {
-      // PGRST116 é o código de erro para "não encontrado" no Supabase (PostgREST)
+      // PGRST116 Ã© o cÃ³digo de erro para "nÃúo encontrado" no Supabase (PostgREST)
       if (error.code === 'PGRST116') {
         return null
       }
@@ -142,9 +261,7 @@ export const sessionService = {
       ...session,
       // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar.
       // Assume que session.session_date pode vir como string (já formatada) ou Date.
-      session_date: typeof session.session_date === 'string' 
-        ? session.session_date 
-        : toISOStringUTC(new Date(session.session_date))
+      session_date: normalizeSessionDateValue(session.session_date)
     }
     
     const { data, error } = await supabase
@@ -165,12 +282,6 @@ export const sessionService = {
       throw new Error(`Failed to create session: ${error.message}`)
     }
 
-    try {
-      await notificationService.ensureSessionNotifications([data])
-    } catch (integrationError) {
-      console.error('Error integrating session with notifications:', integrationError)
-    }
-
     return data
   },
 
@@ -186,9 +297,7 @@ export const sessionService = {
     const updateData = { ...updates }
     if (updateData.session_date) {
       // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar, se a data for atualizada.
-      updateData.session_date = typeof updateData.session_date === 'string' 
-        ? updateData.session_date 
-        : toISOStringUTC(new Date(updateData.session_date))
+      updateData.session_date = normalizeSessionDateValue(updateData.session_date)
     }
     
     const { data, error } = await supabase
@@ -208,12 +317,6 @@ export const sessionService = {
 
     if (error) {
       throw new Error(`Failed to update session: ${error.message}`)
-    }
-
-    try {
-      await notificationService.ensureSessionNotifications([data], { updateExisting: true })
-    } catch (integrationError) {
-      console.error('Error integrating updated session with notifications:', integrationError)
     }
 
     return data
@@ -248,15 +351,15 @@ export const sessionService = {
    */
   async createMultipleSessions(
     patientId: string, 
-    schedules: Array<{dayOfWeek: number, time: string, paymentStatus: string}>,
+    schedules: SessionSchedule[],
     weeksToCreate: number = 12
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    // Obtém a data e hora atual no fuso horário local do ambiente.
+    // ObtÃ©m a data e hora atual no fuso horÃírio local do ambiente.
     const nowLocal = new Date();
 
-    // Buscar dados do paciente para pegar o preço da sessão
+    // Buscar dados do paciente para pegar o preÃ§o da sessÃúo
     const { data: patient } = await supabase
       .from('patients')
       .select('session_price')
@@ -284,13 +387,13 @@ export const sessionService = {
 
         sessions.push({
           patient_id: patientId,
-          // Converte a data e hora final (que está no fuso horário local) para UTC
+          // Converte a data e hora final (que estÃí no fuso horÃírio local) para UTC
           // antes de enviar para o banco de dados.
           session_date: toISOStringUTC(sessionDateLocal),
-          duration_minutes: 50,
-          session_type: 'Sessão Individual',
-          session_price: patient?.session_price || null,
-          payment_status: schedule.paymentStatus,
+          duration_minutes: schedule.durationMinutes ?? 50,
+          session_type: schedule.sessionType || 'Sessao Individual',
+          session_price: schedule.sessionPrice ?? (patient?.session_price || null),
+          payment_status: schedule.paymentStatus || 'pending',
           summary: null,
           session_notes: null,
           mood_before: null,
@@ -299,6 +402,35 @@ export const sessionService = {
           next_session_date: null
         })
       }
+    }
+
+    const existingSessions = await fetchSessions()
+    const plannedSessions: Session[] = []
+
+    for (const session of sessions) {
+      const candidateStart = parseISO(session.session_date)
+      const duration = session.duration_minutes ?? 50
+      const conflict = findSessionConflict(
+        [...existingSessions, ...plannedSessions],
+        candidateStart,
+        duration
+      )
+
+      if (conflict) {
+        const conflictName = conflict.patients?.full_name || 'outro paciente'
+        throw new Error(`Conflito de horario com sessao de ${conflictName}`)
+      }
+
+      plannedSessions.push({
+        id: `planned-${plannedSessions.length}`,
+        patient_id: session.patient_id,
+        session_date: session.session_date,
+        duration_minutes: session.duration_minutes,
+        session_type: session.session_type,
+        session_price: session.session_price,
+        payment_status: session.payment_status,
+        user_id: ''
+      } as Session)
     }
     
     const { data, error } = await supabase
@@ -318,25 +450,73 @@ export const sessionService = {
       throw new Error(`Failed to create multiple sessions: ${error.message}`)
     }
 
-    if (data?.length) {
-      try {
-        await notificationService.ensureSessionNotifications(data)
-      } catch (integrationError) {
-        console.error('Error integrating sessions with notifications:', integrationError)
-      }
-    }
-    
     return data || []
   },
   /**
-   * Substitui sessões futuras (não pagas) de um paciente por novas sessões automáticas.
+   * Atualiza o status de pagamento de multiplas sessoes.
+   * @param sessionIds IDs das sessoes para atualizar.
+   * @param paymentStatus Novo status de pagamento.
+   */
+  async updateSessionsStatus(
+    sessionIds: string[],
+    paymentStatus: string
+  ): Promise<Session[]> {
+    if (sessionIds.length === 0) {
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .update({ payment_status: paymentStatus })
+      .in('id', sessionIds)
+      .select(`
+        *,
+        patients (
+          id,
+          full_name,
+          email,
+          phone
+        )
+      `)
+
+    if (error) {
+      throw new Error(`Failed to update sessions status: ${error.message}`)
+    }
+
+    return data || []
+  },
+  /**
+   * Remarca uma sessao e sincroniza a data financeira quando ja estiver paga.
+   */
+  async rescheduleSession(sessionId: string, sessionDate: string): Promise<Session> {
+    const updatedSession = await this.updateSession(sessionId, {
+      session_date: sessionDate
+    })
+
+    if (updatedSession.payment_status === 'paid') {
+      const transactionDate = updatedSession.session_date.slice(0, 10)
+
+      const { error } = await supabase
+        .from('financial_records')
+        .update({ transaction_date: transactionDate })
+        .eq('session_id', sessionId)
+
+      if (error) {
+        console.error('Error updating financial record date for session:', error)
+      }
+    }
+
+    return updatedSession
+  },
+  /**
+   * Substitui sessÃµes futuras (nÃúo pagas) de um paciente por novas sessÃµes automÃíticas.
    * @param patientId O ID do paciente.
    * @param schedules Um array de agendamentos recorrentes.
-   * @param weeksToCreate O número de semanas para recriar sessões.
+   * @param weeksToCreate O nÃºmero de semanas para recriar sessÃµes.
    */
   async replaceFutureSessions(
     patientId: string,
-    schedules: Array<{dayOfWeek: number, time: string, paymentStatus: string}>,
+    schedules: SessionSchedule[],
     weeksToCreate: number = 12
   ): Promise<Session[]> {
     const now = new Date().toISOString()
@@ -355,3 +535,6 @@ export const sessionService = {
     return this.createMultipleSessions(patientId, schedules, weeksToCreate)
   }
 }
+
+
+

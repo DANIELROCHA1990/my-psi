@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+﻿import { supabase } from '../lib/supabase'
 import { Profile } from '../types'
 
 export const profileService = {
@@ -37,3 +37,4 @@ export const profileService = {
     return { data, error }
   }
 }
+

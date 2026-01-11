@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
-import { patientService } from '../services/patientService'
-import { Session, Patient } from '../types'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User } from 'lucide-react'
+import { Session } from '../types'
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Edit } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
+import { findSessionConflict } from '../lib/scheduling'
+import { normalizeSearchText } from '../lib/search'
 
 // Utilitario: Garante que todas as datas sejam interpretadas como UTC.
 // Se a string já tem 'Z', parseISO a trata como UTC.
@@ -22,13 +23,271 @@ function parseUTC(dateString: string): Date {
   return parseISO(dateString);
 }
 
+function formatSessionTypeLabel(value?: string): string {
+  if (!value) {
+    return 'Sessao'
+  }
+
+  const normalized = normalizeSearchText(value)
+
+  if (normalized.includes('individual')) {
+    return 'Sessao Individual'
+  }
+  if (normalized.includes('grupo')) {
+    return 'Sessao em Grupo'
+  }
+  if (normalized.includes('familiar')) {
+    return 'Sessao Familiar'
+  }
+  if (normalized.includes('avaliacao')) {
+    return 'Avaliacao'
+  }
+  if (normalized.includes('retorno')) {
+    return 'Retorno'
+  }
+  if (normalized.includes('sess')) {
+    return 'Sessao'
+  }
+
+  return value
+}
+
+function SessionEditModal({
+  session,
+  allSessions,
+  onClose,
+  onSaved
+}: {
+  session: Session
+  allSessions: Session[]
+  onClose: () => void
+  onSaved: (updatedSession: Session) => void
+}) {
+  const initialSessionDate = format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm")
+  const [formData, setFormData] = useState({
+    session_date: initialSessionDate,
+    duration_minutes: session.duration_minutes?.toString() || '50',
+    session_type: session.session_type || 'Sessao Individual',
+    session_price: session.session_price?.toString() || '',
+    payment_status: session.payment_status || 'pending',
+    summary: session.summary || ''
+  })
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    if (!formData.session_date) {
+      toast.error('Data e hora sao obrigatorias')
+      return
+    }
+
+    const candidateStart = parseISO(formData.session_date)
+    if (Number.isNaN(candidateStart.getTime())) {
+      toast.error('Data invalida')
+      return
+    }
+
+    const duration = formData.duration_minutes ? Number(formData.duration_minutes) : 50
+    const conflict = findSessionConflict(allSessions, candidateStart, duration, {
+      excludeSessionId: session.id
+    })
+
+    if (conflict) {
+      const conflictName = conflict.patients?.full_name || 'paciente'
+      toast.error(`Conflito com sessao de ${conflictName}`)
+      return
+    }
+
+    const sessionDateChanged = formData.session_date !== initialSessionDate
+
+    setSaving(true)
+
+    try {
+      if (sessionDateChanged) {
+        await sessionService.rescheduleSession(session.id, formData.session_date)
+      }
+
+      const updates: Partial<Session> = {
+        duration_minutes: formData.duration_minutes ? Number(formData.duration_minutes) : undefined,
+        session_type: formData.session_type || undefined,
+        session_price: formData.session_price ? Number(formData.session_price) : undefined,
+        payment_status: formData.payment_status || 'pending',
+        summary: formData.summary || undefined
+      }
+
+      const updatedSession = await sessionService.updateSession(session.id, updates)
+      onSaved(updatedSession)
+      toast.success('Sessao atualizada')
+      onClose()
+    } catch (error) {
+      toast.error('Erro ao atualizar sessao')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancelSession = async () => {
+    if (session.payment_status === 'cancelled') {
+      toast.error('Sessao ja esta cancelada')
+      return
+    }
+
+    if (!confirm('Tem certeza que deseja cancelar esta sessao?')) {
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const updatedSession = await sessionService.updateSession(session.id, {
+        payment_status: 'cancelled'
+      })
+      onSaved(updatedSession)
+      toast.success('Sessao cancelada')
+      onClose()
+    } catch (error) {
+      toast.error('Erro ao cancelar sessao')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">Editar sessao</h2>
+          <p className="text-sm text-gray-600 mt-1">{session.patients?.full_name}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data e hora
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={formData.session_date}
+                onChange={(event) => setFormData(prev => ({ ...prev, session_date: event.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Duracao (minutos)
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={formData.duration_minutes}
+                onChange={(event) => setFormData(prev => ({ ...prev, duration_minutes: event.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de sessao
+              </label>
+              <select
+                value={formData.session_type}
+                onChange={(event) => setFormData(prev => ({ ...prev, session_type: event.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="Sessao Individual">Sessao Individual</option>
+                <option value="Sessao em Grupo">Sessao em Grupo</option>
+                <option value="Sessao Familiar">Sessao Familiar</option>
+                <option value="Avaliacao">Avaliacao</option>
+                <option value="Retorno">Retorno</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Valor (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.session_price}
+                onChange={(event) => setFormData(prev => ({ ...prev, session_price: event.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status do pagamento
+              </label>
+              <select
+                value={formData.payment_status}
+                onChange={(event) => setFormData(prev => ({ ...prev, payment_status: event.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="pending">Pendente</option>
+                <option value="paid">Pago</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Resumo
+            </label>
+            <textarea
+              rows={3}
+              value={formData.summary}
+              onChange={(event) => setFormData(prev => ({ ...prev, summary: event.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="Resumo da sessao"
+            />
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={handleCancelSession}
+              disabled={saving}
+              className="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-60"
+            >
+              Cancelar sessao
+            </button>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-60"
+              >
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date()) // currentDate é um objeto Date local
   const [sessions, setSessions] = useState<Session[]>([])
-  const [patients, setPatients] = useState<Patient[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null) // selectedDate é um objeto Date local
   const [selectedDateSessions, setSelectedDateSessions] = useState<Session[]>([])
+  const [editingSession, setEditingSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -38,12 +297,8 @@ export default function Calendar() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [sessionsData, patientsData] = await Promise.all([
-        sessionService.getSessions(),
-        patientService.getPatients()
-      ])
+      const sessionsData = await sessionService.getSessions()
       setSessions(sessionsData)
-      setPatients(patientsData)
     } catch (error) {
       toast.error('Erro ao carregar dados do calendário')
     } finally {
@@ -70,10 +325,33 @@ export default function Calendar() {
     })
   }
 
+  const getSessionsForDateFromList = (list: Session[], date: Date) => {
+    return list.filter(session => {
+      const sessionDateUTC = parseUTC(session.session_date)
+      return isSameDay(sessionDateUTC, date) && session.payment_status !== 'cancelled'
+    })
+  }
+
   const handleDateClick = (date: Date) => {
     setSelectedDate(date)
     const dateSessions = getSessionsForDate(date)
     setSelectedDateSessions(dateSessions)
+  }
+
+  const handleSessionsUpdated = (updatedSessions: Session[]) => {
+    if (!updatedSessions.length) {
+      return
+    }
+
+    setSessions(prev => {
+      const sessionMap = new Map(prev.map(session => [session.id, session]))
+      updatedSessions.forEach(session => sessionMap.set(session.id, session))
+      const nextSessions = Array.from(sessionMap.values())
+      if (selectedDate) {
+        setSelectedDateSessions(getSessionsForDateFromList(nextSessions, selectedDate))
+      }
+      return nextSessions
+    })
   }
 
   const handlePreviousMonth = () => {
@@ -219,16 +497,26 @@ export default function Calendar() {
                               {session.patients?.full_name}
                             </span>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            session.payment_status === 'paid' 
-                              ? 'bg-green-100 text-green-800'
-                              : session.payment_status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {session.payment_status === 'paid' ? 'Pago' : 
-                             session.payment_status === 'pending' ? 'Pendente' : 'Cancelado'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              session.payment_status === 'paid' 
+                                ? 'bg-green-100 text-green-800'
+                                : session.payment_status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {session.payment_status === 'paid' ? 'Pago' : 
+                               session.payment_status === 'pending' ? 'Pendente' : 'Cancelado'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingSession(session)}
+                              className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="Editar sessao"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                         
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
@@ -241,7 +529,7 @@ export default function Calendar() {
                         </div>
                         
                         <div className="text-sm text-gray-600">
-                          {session.session_type}
+                          {formatSessionTypeLabel(session.session_type)}
                         </div>
                         
                         {session.session_price && (
@@ -268,9 +556,22 @@ export default function Calendar() {
           </div>
         </div>
       </div>
+
+      {editingSession && (
+        <SessionEditModal
+          session={editingSession}
+          allSessions={sessions}
+          onClose={() => setEditingSession(null)}
+          onSaved={(updatedSession) => {
+            handleSessionsUpdated([updatedSession])
+            setEditingSession(null)
+          }}
+        />
+      )}
     </div>
   )
 }
+
 
 
 

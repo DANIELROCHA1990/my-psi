@@ -1,4 +1,4 @@
-export interface User {
+﻿export interface User {
   id: string
   email: string
   created_at?: string
@@ -42,6 +42,8 @@ export interface Patient {
   therapy_goals?: string
   session_frequency: string
   session_price?: number
+  auto_renew_sessions?: boolean
+  session_schedules?: SessionSchedule[]
   active: boolean
   updated_at?: string
 }
@@ -50,6 +52,9 @@ export interface SessionSchedule {
   dayOfWeek: number // 0 = domingo, 1 = segunda, etc.
   time: string // formato HH:mm
   paymentStatus: 'paid' | 'pending'
+  sessionType?: string
+  durationMinutes?: number
+  sessionPrice?: number
 }
 
 export interface Session {
@@ -88,18 +93,3 @@ export interface FinancialRecord {
   sessions?: Session
 }
 
-export interface Notification {
-  id: string
-  user_id: string
-  patient_id?: string
-  session_id?: string
-  notification_type: string
-  title: string
-  message: string
-  scheduled_for: string
-  sent_at?: string
-  status: string
-  created_at?: string
-  patients?: Patient
-  sessions?: Session
-}

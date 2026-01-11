@@ -2,9 +2,10 @@
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { Patient } from '../types'
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, MapPin, Calendar, Activity, Clock } from 'lucide-react'
+import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { normalizeSearchText } from '../lib/search'
 import { ptBR } from 'date-fns/locale'
 
 export default function Patients() {
@@ -13,6 +14,7 @@ export default function Patients() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
+  const [reactivateMode, setReactivateMode] = useState(false)
 
   useEffect(() => {
     loadPatients()
@@ -30,24 +32,36 @@ export default function Patients() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este paciente?')) return
+  const handleDeactivate = async (patient: Patient) => {
+    if (!patient.active) {
+      toast.error('Paciente já está inativo')
+      return
+    }
+
+    if (!confirm('Tem certeza que deseja inativar este paciente? As sessões e lançamentos financeiros futuros serão apagados.')) return
 
     try {
-      const { error } = await patientService.deletePatient(id)
+      const { error } = await patientService.deactivatePatient(patient.id)
       if (error) throw error
       
-      setPatients(prev => prev.filter(p => p.id !== id))
-      toast.success('Paciente excluído com sucesso')
+      setPatients(prev => prev.map(p => p.id === patient.id ? { ...p, active: false } : p))
+      toast.success('Paciente inativado com sucesso')
     } catch (error) {
-      toast.error('Erro ao excluir paciente')
+      toast.error('Erro ao inativar paciente')
     }
   }
 
+  const handleActivate = (patient: Patient) => {
+    setReactivateMode(true)
+    setEditingPatient({ ...patient, active: true })
+  }
+
+  const normalizedSearch = normalizeSearchText(searchTerm.trim())
+
   const filteredPatients = patients.filter(patient =>
-    patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.phone?.includes(searchTerm)
+    normalizeSearchText(patient.full_name).includes(normalizedSearch) ||
+    normalizeSearchText(patient.email || '').includes(normalizedSearch) ||
+    (patient.phone || '').includes(searchTerm.trim())
   )
 
   const activePatients = patients.filter(p => p.active).length
@@ -70,7 +84,7 @@ export default function Patients() {
           <p className="text-gray-600 mt-2">Gerencie seus pacientes e suas informações.</p>
         </div>
         <button
-          onClick={() => setShowAddForm(true)}
+          onClick={() => { setReactivateMode(false); setShowAddForm(true) }}
           className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
         >
           <Plus className="h-5 w-5" />
@@ -195,19 +209,29 @@ export default function Patients() {
                   
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setEditingPatient(patient)}
+                      onClick={() => { setReactivateMode(false); setEditingPatient(patient) }}
                       className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                       title="Editar paciente"
                     >
                       <Edit className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(patient.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir paciente"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {patient.active ? (
+                      <button
+                        onClick={() => handleDeactivate(patient)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Inativar paciente"
+                      >
+                        <UserX className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleActivate(patient)}
+                        className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Reativar paciente"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -229,7 +253,7 @@ export default function Patients() {
             </p>
             {!searchTerm && (
               <button
-                onClick={() => setShowAddForm(true)}
+                onClick={() => { setReactivateMode(false); setShowAddForm(true) }}
                 className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
                 Cadastrar Primeiro Paciente
@@ -243,14 +267,17 @@ export default function Patients() {
       {(showAddForm || editingPatient) && (
         <PatientModal
           patient={editingPatient}
+          forceManageAutoSessions={reactivateMode}
           onClose={() => {
             setShowAddForm(false)
             setEditingPatient(null)
+            setReactivateMode(false)
           }}
           onSave={() => {
             loadPatients()
             setShowAddForm(false)
             setEditingPatient(null)
+            setReactivateMode(false)
           }}
         />
       )}
@@ -262,11 +289,13 @@ export default function Patients() {
 function PatientModal({ 
   patient, 
   onClose, 
-  onSave 
+  onSave,
+  forceManageAutoSessions = false
 }: { 
   patient: Patient | null
   onClose: () => void
   onSave: () => void
+  forceManageAutoSessions?: boolean
 }) {
   const [formData, setFormData] = useState({
     full_name: patient?.full_name || '',
@@ -285,17 +314,20 @@ function PatientModal({
     therapy_goals: patient?.therapy_goals || '',
     session_frequency: patient?.session_frequency || 'weekly',
     session_price: patient?.session_price?.toString() || '',
-    active: patient?.active ?? true
+    active: patient?.active ?? true,
+    auto_renew_sessions: patient?.auto_renew_sessions ?? false
   })
   
   const [sessionSchedules, setSessionSchedules] = useState<Array<{
     dayOfWeek: number,
     time: string,
     paymentStatus: 'paid' | 'pending'
-  }>>([])
+  }>>(patient?.session_schedules || [])
   
   const isNewPatient = !patient
-  const [manageAutoSessions, setManageAutoSessions] = useState(isNewPatient)
+  const [manageAutoSessions, setManageAutoSessions] = useState(
+    isNewPatient || forceManageAutoSessions || (patient?.session_schedules?.length ?? 0) > 0
+  )
   const [loading, setLoading] = useState(false)
   
   const daysOfWeek = [
@@ -339,6 +371,7 @@ function PatientModal({
     try {
       const patientData = {
         ...formData,
+        session_schedules: sessionSchedules.length > 0 ? sessionSchedules : patient?.session_schedules || null,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         birth_date: formData.birth_date || undefined,
         email: formData.email || undefined,
@@ -358,7 +391,6 @@ function PatientModal({
       if (patient) {
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
-
         if (manageAutoSessions && sessionSchedules.length > 0) {
           try {
             await sessionService.replaceFutureSessions(
@@ -660,6 +692,25 @@ function PatientModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Valor que será usado em todas as sessões"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900">Renovacao automatica</h4>
+                    <p className="text-sm text-gray-600">
+                      Ao finalizar todas as sessoes, novas sessoes serao criadas com o mesmo padrao.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.auto_renew_sessions}
+                      onChange={(e) => setFormData(prev => ({ ...prev, auto_renew_sessions: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+﻿import { supabase } from '../lib/supabase'
 import { Patient } from '../types'
 
 export const patientService = {
@@ -77,5 +77,42 @@ export const patientService = {
       .eq('id', id)
 
     return { error }
+  },
+
+  async deactivatePatient(id: string) {
+    const { error: updateError } = await supabase
+      .from('patients')
+      .update({ active: false })
+      .eq('id', id)
+
+    if (updateError) {
+      console.error('Error deactivating patient:', updateError)
+      return { error: updateError }
+    }
+
+    const nowIso = new Date().toISOString()
+    const today = nowIso.slice(0, 10)
+
+    const [{ error: sessionsError }, { error: financialError }] = await Promise.all([
+      supabase
+        .from('sessions')
+        .delete()
+        .eq('patient_id', id)
+        .gte('session_date', nowIso),
+      supabase
+        .from('financial_records')
+        .delete()
+        .eq('patient_id', id)
+        .gte('transaction_date', today)
+    ])
+
+    if (sessionsError) {
+      console.error('Error deleting future sessions for patient:', sessionsError)
+    }
+    if (financialError) {
+      console.error('Error deleting future financial records for patient:', financialError)
+    }
+
+    return { error: sessionsError || financialError }
   }
 }

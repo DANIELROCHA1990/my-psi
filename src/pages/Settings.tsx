@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { profileService } from '../services/profileService'
 import { authService } from '../services/authService'
 import { Profile } from '../types'
-import { User, Lock, Bell, Mail, Phone, MapPin, DollarSign, Save, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, Mail, Phone, MapPin, DollarSign, Save, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Settings() {
@@ -32,13 +32,6 @@ export default function Settings() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
-  })
-
-  const [notificationSettings, setNotificationSettings] = useState({
-    email_reminders: true,
-    sms_reminders: false,
-    session_reminders: true,
-    payment_reminders: true
   })
 
   useEffect(() => {
@@ -135,20 +128,6 @@ export default function Settings() {
     }
   }
 
-  const handleSaveNotifications = async () => {
-    setSaving(true)
-    
-    try {
-      // Mock save notifications
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      toast.success('Configurações de notificação salvas')
-    } catch (error) {
-      toast.error('Erro ao salvar configurações')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -169,7 +148,7 @@ export default function Settings() {
         {/* Tabs */}
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
-            <button
+                      <button
               onClick={() => setActiveTab('profile')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'profile'
@@ -182,7 +161,7 @@ export default function Settings() {
                 Perfil
               </div>
             </button>
-            <button
+                      <button
               onClick={() => setActiveTab('security')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'security'
@@ -192,20 +171,7 @@ export default function Settings() {
             >
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                Segurança
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('notifications')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'notifications'
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                Notificações
+                Seguranca
               </div>
             </button>
           </nav>
@@ -465,93 +431,12 @@ export default function Settings() {
             </form>
           )}
 
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Preferências de Notificação</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">Lembretes por Email</h4>
-                      <p className="text-sm text-gray-600">Receba lembretes de sessões e pagamentos por email</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notificationSettings.email_reminders}
-                        onChange={(e) => setNotificationSettings(prev => ({ ...prev, email_reminders: e.target.checked }))}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">Lembretes por SMS</h4>
-                      <p className="text-sm text-gray-600">Receba lembretes importantes por SMS</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notificationSettings.sms_reminders}
-                        onChange={(e) => setNotificationSettings(prev => ({ ...prev, sms_reminders: e.target.checked }))}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">Lembretes de Sessão</h4>
-                      <p className="text-sm text-gray-600">Notificações sobre próximas sessões agendadas</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notificationSettings.session_reminders}
-                        onChange={(e) => setNotificationSettings(prev => ({ ...prev, session_reminders: e.target.checked }))}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">Lembretes de Pagamento</h4>
-                      <p className="text-sm text-gray-600">Notificações sobre pagamentos pendentes</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notificationSettings.payment_reminders}
-                        onChange={(e) => setNotificationSettings(prev => ({ ...prev, payment_reminders: e.target.checked }))}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                  </div>
-                  
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSaveNotifications}
-                  disabled={saving}
-                  className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Salvando...' : 'Salvar Configurações'}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
   )
 }
+
+
+
 

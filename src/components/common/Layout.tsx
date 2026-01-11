@@ -5,14 +5,14 @@ import { authService } from '../../services/authService'
 import {
   Brain,
   LayoutDashboard,
-  Users,
-  Calendar,
-  DollarSign,
-  Settings,
+  UserRound,
+  CalendarClock,
+  CalendarCheck2,
+  Wallet,
+  SlidersHorizontal,
   LogOut,
   Menu,
   X,
-  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Moon,
@@ -67,11 +67,11 @@ export default function Layout({ children }: LayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Pacientes', href: '/patients', icon: Users },
-    { name: 'Sessões', href: '/sessions', icon: ClipboardList },
-    { name: 'Agenda', href: '/calendar', icon: Calendar },
-    { name: 'Financeiro', href: '/financial', icon: DollarSign },
-    { name: 'Configurações', href: '/settings', icon: Settings }
+    { name: 'Pacientes', href: '/patients', icon: UserRound },
+    { name: 'Sessoes', href: '/sessions', icon: CalendarCheck2 },
+    { name: 'Agenda', href: '/calendar', icon: CalendarClock },
+    { name: 'Financeiro', href: '/financial', icon: Wallet },
+    { name: 'Configuracoes', href: '/settings', icon: SlidersHorizontal }
   ]
 
   return (
@@ -289,3 +289,4 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   )
 }
+

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, subMonths, subYears } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { normalizeSearchText } from '../lib/search'
 
 export default function Financial() {
   const [records, setRecords] = useState<FinancialRecord[]>([])
@@ -161,14 +162,14 @@ export default function Financial() {
     if (paymentMethodFilter !== 'all' && record.payment_method !== paymentMethodFilter) {
       return false
     }
-    const needle = searchTerm.toLowerCase()
+    const needle = normalizeSearchText(searchTerm.trim())
     if (!needle) {
       return true
     }
     return (
-      record.patients?.full_name?.toLowerCase().includes(needle) ||
-      record.description?.toLowerCase().includes(needle) ||
-      record.payment_method.toLowerCase().includes(needle)
+      normalizeSearchText(record.patients?.full_name || '').includes(needle) ||
+      normalizeSearchText(record.description || '').includes(needle) ||
+      normalizeSearchText(record.payment_method || '').includes(needle)
     )
   })
 
@@ -1013,4 +1014,5 @@ function FinancialModal({
     </div>
   )
 }
+
 
