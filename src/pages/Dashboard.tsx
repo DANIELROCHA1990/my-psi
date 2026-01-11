@@ -143,7 +143,7 @@ export default function Dashboard() {
         {/* Upcoming Sessions */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-gray-900">Próximas Sessões</h2>
               <Clock className="h-5 w-5 text-gray-400" />
             </div>
@@ -152,14 +152,14 @@ export default function Dashboard() {
             {upcomingSessions.length > 0 ? (
               <div className="space-y-4">
                 {upcomingSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div key={session.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900">{session.patients?.full_name}</p>
                       <p className="text-sm text-gray-600">
                         {format(parseISO(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                       <p className="text-sm font-medium text-gray-900">
                         {session.duration_minutes} min
                       </p>
@@ -180,7 +180,7 @@ export default function Dashboard() {
         {/* Recent Transactions */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-gray-900">Transações Recentes</h2>
               <DollarSign className="h-5 w-5 text-gray-400" />
             </div>
@@ -189,8 +189,8 @@ export default function Dashboard() {
             {recentTransactions.length > 0 ? (
               <div className="space-y-4">
                 {recentTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
+                  <div key={transaction.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
                       <div className={`p-2 rounded-full ${
                         transaction.transaction_type === 'income' 
                           ? 'bg-green-50' 
@@ -202,7 +202,7 @@ export default function Dashboard() {
                             : 'text-red-600'
                         }`} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium text-gray-900">
                           {transaction.patients?.full_name || transaction.description}
                         </p>
@@ -211,7 +211,7 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                       <p className={`font-medium ${
                         transaction.transaction_type === 'income' 
                           ? 'text-green-600' 

@@ -155,7 +155,7 @@ function SessionEditModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Editar sessao</h2>
           <p className="text-sm text-gray-600 mt-1">{session.patients?.full_name}</p>
@@ -383,7 +383,7 @@ export default function Calendar() {
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             {/* Calendar Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
                 {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
               </h2>
@@ -404,11 +404,11 @@ export default function Calendar() {
             </div>
 
             {/* Calendar Grid */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Days of week header */}
               <div className="grid grid-cols-7 gap-1 mb-4">
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                  <div key={day} className="p-2 text-center text-sm font-medium text-gray-600">
+                  <div key={day} className="p-1 sm:p-2 text-center text-[11px] sm:text-sm font-medium text-gray-600">
                     {day}
                   </div>
                 ))}
@@ -426,12 +426,12 @@ export default function Calendar() {
                       key={day.toISOString()}
                       onClick={() => handleDateClick(day)}
                       className={`
-                        relative p-2 h-20 text-left border border-gray-100 hover:bg-gray-50 transition-colors
+                        relative p-1 sm:p-2 h-16 sm:h-20 text-left border border-gray-100 hover:bg-gray-50 transition-colors
                         ${isSelected ? 'bg-emerald-50 border-emerald-200' : ''}
                         ${!isCurrentMonth ? 'text-gray-400' : ''}
                       `}
                     >
-                      <span className={`text-sm font-medium ${
+                      <span className={`text-xs sm:text-sm font-medium ${
                         isSameDay(day, new Date()) ? 'text-emerald-600' : ''
                       }`}>
                         {format(day, 'd')}
@@ -490,7 +490,7 @@ export default function Calendar() {
                   <div className="space-y-4">
                     {selectedDateSessions.map(session => (
                       <div key={session.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 text-gray-400" />
                             <span className="font-medium text-gray-900">
@@ -519,7 +519,7 @@ export default function Calendar() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
                             {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
