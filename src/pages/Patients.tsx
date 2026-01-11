@@ -1,12 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
-import { Patient } from '../types'
-import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock } from 'lucide-react'
+import { Patient, SessionSchedule } from '../types'
+import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { normalizeSearchText } from '../lib/search'
 import { ptBR } from 'date-fns/locale'
+import { jsPDF } from 'jspdf'
 
 export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([])
@@ -66,6 +67,269 @@ export default function Patients() {
 
   const activePatients = patients.filter(p => p.active).length
   const totalPatients = patients.length
+
+  const contractDaysOfWeek = [
+    { value: 0, label: 'Domingo' },
+    { value: 1, label: 'Segunda-feira' },
+    { value: 2, label: 'Terca-feira' },
+    { value: 3, label: 'Quarta-feira' },
+    { value: 4, label: 'Quinta-feira' },
+    { value: 5, label: 'Sexta-feira' },
+    { value: 6, label: 'Sabado' }
+  ]
+
+  const frequencyLabels: Record<string, string> = {
+    weekly: 'Semanal',
+    biweekly: 'Quinzenal',
+    monthly: 'Mensal',
+    as_needed: 'Conforme necessario'
+  }
+
+  const paymentStatusLabels: Record<string, string> = {
+    paid: 'Pago',
+    pending: 'Pendente',
+    cancelled: 'Cancelado'
+  }
+
+  const contractClauses = [
+    '1. O processo de psicoterapia iniciara a partir da autorizacao de um(a) dos(as) responsaveis da crianca ou adolescente. O processo se dara em medio a longo prazo. Afirma-se o sigilo profissional dos atendimentos, no qual nao ha violacao dos dados, ou seja, informacoes obtidas nos atendimentos com o(a) paciente para outrem. (Com excecao em casos do(a) paciente colocar a propria vida em risco ou de outrem).',
+    '2. O processo deve ser iniciado a partir da entrevista com pais e/ou responsaveis da crianca ou adolescente, recolhendo as principais informacoes e os motivos para iniciar o processo. As entrevistas com os pais e/ou responsaveis deve ser realizada de forma periodica a medida que a profissional sinta necessidade, ou ainda que os proprios responsaveis do(a) paciente solicitem.',
+    '2.1. O atendimento com os responsaveis do(a) adolescente acontecera mediante aos acordos feitos entre paciente e a profissional, caso lhe for pertinente.',
+    '3. Os atendimentos terao frequencia de, no minimo, uma vez por semana, em horario e dia preestabelecidos por todas as partes. Podendo passar por alteracoes e/ou aumento de sessoes semanais, caso haja necessidade clinica.',
+    '4. O valor das sessoes sera definido pela profissional, mas podera passar por alteracoes no decorrer do processo a medida que as partes sintam a necessidade de modificar.',
+    '5. O valor da sessao sofrera reajuste anual de 10%, acordado em contrato com o(s) responsavel(eis), acontecendo no inicio de cada ano ou a cada ano de acompanhamento.',
+    '6. O pagamento das sessoes e definido pela profissional, sendo tambem um combinado entre as partes, podendo sofrer ou nao alteracao, como informado no item 3 e 4.',
+    '7. As faltas, os atrasos e as interrupcoes do processo devem ser avisadas com antecedencia a profissional, para que nao prejudique o processo do(a) paciente. E possivel que, diante das dificuldades de permanencia, seja necessario encaminhar o(a) paciente para outro(a) profissional.',
+    '8. A profissional avisara com antecedencia em caso de faltas ou atrasos. Assim, disponibilizando-se para a reposicao dos atendimentos e das horas, sem onus da sessao de reposicao.',
+    '9. Faltas serao cobradas, com ou sem aviso previo, faltas informadas antes de 24 horas poderao realizar reposicao sem custo adicional, caso seja avisado dentro das 24h da sessao, a sessao de reposicao sera cobrada como sessao extra.',
+    '10. A profissional avisara com antecedencia quando lhe couber tirar ferias ou recesso, tendo, portanto, breve interrupcao dos atendimentos/pagamentos. As ferias podem ocorrer uma ou duas vezes ao ano, no mes de julho e/ou no mes de dezembro (recesso das festas e dos feriados de final de ano). No entanto, podem ocorrer modificacoes caso o processo possa sofrer prejuizos com a interrupcao ocasionada por ferias ou recesso. As sessoes que nao ocorrerem devido as ferias da profissional nao serao cobradas.',
+    '11. Em caso de ferias escolares, as sessoes nao sofrem mudanca, sendo estas permanecendo em seu horario reservado preservado, com os mesmos combinados em contrato.',
+    '12. E de suma importancia a presenca semanal do(a) paciente nas sessoes, sendo repensada a continuidade caso haja pelo menos tres faltas consecutivas. Logo, as entrevistas periodicas com os pais tambem sao realizadas pelo menos a cada seis a oito sessoes com a crianca ou o adolescente. Essa periodicidade semanal dos atendimentos com o(a) paciente pode ser repensada, bem como as periodicidades dos atendimentos com a familia.',
+    '13. Os atendimentos duram em torno de, no minimo, 45 minutos. Em caso de atrasos do(a) paciente, o tempo nao sera alterado, sendo utilizado o tempo restante da sessao. Em caso de a profissional atrasar, o tempo do paciente nao e prejudicado, sendo reposto na mesma sessao ou em outras, seguintes.',
+    '14. Em caso de interrupcao do processo, e relevante que sejam realizadas sessoes para facilitar o processo de desligamento da crianca ou adolescente, como tambem a realizacao de pelo menos uma sessao com os pais e/ou responsaveis.',
+    '15. Em caso de necessidade de outros acompanhamentos, a profissional podera realizar encaminhamentos para outros especialistas com o intuito de complementar e ampliar o cuidado do(a) paciente, bem como encaminhamentos direcionados aos membros da familia do(a) paciente.',
+    '16. A profissional podera ficar autorizada a realizar visitas escolares e/ou contato com outros profissionais que o(a) acompanham, rede de apoio ou membros que fazem parte do ciclo de relacoes da crianca ou adolescente.'
+  ]
+
+  const formatBirthDate = (value?: string) => {
+    if (!value) {
+      return ''
+    }
+    const parsed = parseISO(value)
+    if (Number.isNaN(parsed.getTime())) {
+      return value
+    }
+    return format(parsed, 'dd/MM/yyyy')
+  }
+
+  const getDayLabel = (dayOfWeek: number) => {
+    return contractDaysOfWeek.find(day => day.value === dayOfWeek)?.label || 'Dia'
+  }
+
+  const loadSignatureImage = async (src: string) => {
+    const response = await fetch(src)
+    if (!response.ok) {
+      throw new Error('Erro ao carregar assinatura')
+    }
+    const blob = await response.blob()
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('Erro ao ler assinatura'))
+      reader.readAsDataURL(blob)
+    })
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve(image)
+      image.onerror = () => reject(new Error('Erro ao carregar assinatura'))
+      image.src = dataUrl
+    })
+    return { dataUrl, width: img.width, height: img.height }
+  }
+
+  const handleGenerateContract = async (patient: Patient) => {
+    const slug = normalizeSearchText(patient.full_name)
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    const fileName = `contrato-${slug || 'paciente'}.pdf`
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const margin = 48
+    const lineHeight = 16
+    const sectionGap = 10
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const maxWidth = pageWidth - margin * 2
+    let cursorY = margin
+    const signatureImageUrl = new URL('../public/20260111_133550-removebg-preview.png', import.meta.url).toString()
+    let signatureImage: { dataUrl: string; width: number; height: number } | null = null
+
+    try {
+      signatureImage = await loadSignatureImage(signatureImageUrl)
+    } catch (error) {
+      signatureImage = null
+    }
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(11)
+    pdf.setTextColor(0, 0, 0)
+
+    const addPageIfNeeded = (height: number = 0) => {
+      if (cursorY + height > pageHeight - margin) {
+        pdf.addPage()
+        cursorY = margin
+      }
+    }
+
+    const addWrappedLines = (text: string, indent: number = 0) => {
+      const lines = pdf.splitTextToSize(text, maxWidth - indent) as string[]
+      lines.forEach((line) => {
+        addPageIfNeeded(lineHeight)
+        pdf.text(line, margin + indent, cursorY)
+        cursorY += lineHeight
+      })
+    }
+
+    const addTitle = (text: string) => {
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(16)
+      const textWidth = pdf.getTextWidth(text)
+      addPageIfNeeded(lineHeight)
+      pdf.text(text, (pageWidth - textWidth) / 2, cursorY)
+      cursorY += lineHeight + 12
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(11)
+    }
+
+    const addSectionTitle = (text: string) => {
+      addPageIfNeeded(lineHeight * 2)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(12)
+      pdf.text(text, margin, cursorY)
+      cursorY += lineHeight
+      pdf.setDrawColor(220)
+      pdf.line(margin, cursorY, pageWidth - margin, cursorY)
+      cursorY += sectionGap
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(11)
+    }
+
+    addTitle('CONTRATO DE PRESTACAO DE SERVICOS PSICOLOGICOS')
+
+    addSectionTitle('DADOS DO PACIENTE')
+    const patientInfoLines = [
+      `Nome: ${patient.full_name}`,
+      patient.email ? `Email: ${patient.email}` : null,
+      patient.phone ? `Telefone: ${patient.phone}` : null,
+      formatBirthDate(patient.birth_date) ? `Data de nascimento: ${formatBirthDate(patient.birth_date)}` : null,
+      patient.address ? `Endereco: ${patient.address}` : null,
+      (patient.city || patient.state) ? `Cidade/UF: ${[patient.city, patient.state].filter(Boolean).join(' - ')}` : null,
+      patient.zip_code ? `CEP: ${patient.zip_code}` : null
+    ].filter(Boolean) as string[]
+
+    patientInfoLines.forEach((line) => addWrappedLines(line))
+    cursorY += sectionGap
+
+    addSectionTitle('CONFIGURACOES DE SESSAO')
+    addWrappedLines(`Frequencia: ${frequencyLabels[patient.session_frequency] || patient.session_frequency}`)
+    if (patient.session_price !== null && patient.session_price !== undefined) {
+      addWrappedLines(`Valor da sessao: R$ ${Number(patient.session_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+    }
+    cursorY += sectionGap
+
+    if (patient.session_schedules && patient.session_schedules.length) {
+      addSectionTitle('AGENDAMENTOS AUTOMATICOS')
+      patient.session_schedules.forEach((schedule) => {
+        const pieces = [
+          getDayLabel(schedule.dayOfWeek),
+          schedule.time
+        ]
+        if (schedule.sessionType) {
+          pieces.push(schedule.sessionType)
+        }
+        if (schedule.durationMinutes) {
+          pieces.push(`${schedule.durationMinutes} min`)
+        }
+        if (schedule.sessionPrice !== null && schedule.sessionPrice !== undefined) {
+          pieces.push(`R$ ${Number(schedule.sessionPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+        }
+        if (schedule.paymentStatus) {
+          pieces.push(paymentStatusLabels[schedule.paymentStatus] || schedule.paymentStatus)
+        }
+        addWrappedLines(`- ${pieces.join(' | ')}`, 12)
+      })
+      cursorY += sectionGap
+    }
+
+    addSectionTitle('CLAUSULAS')
+    contractClauses.forEach((clause) => {
+      addWrappedLines(clause)
+      cursorY += 6
+    })
+
+    cursorY += sectionGap
+    addWrappedLines('Quaisquer duvidas, fico a disposicao para esclarecimentos.')
+    cursorY += sectionGap
+    addWrappedLines('Local e data: ______________________________')
+    cursorY += lineHeight * 2
+
+    const signatureLineWidth = 240
+    const signatureLineX = (pageWidth - signatureLineWidth) / 2
+    const labelOffset = 14
+    const nameOffset = 14
+    const signatureGap = 28
+    const imageGap = 8
+    const imageMaxWidth = signatureLineWidth
+    const imageMaxHeight = 56
+
+    const drawSignatureBlock = (
+      label: string,
+      name: string | null,
+      includeImage: boolean
+    ) => {
+      let imageHeight = 0
+      let imageWidth = 0
+      if (includeImage && signatureImage) {
+        const ratio = signatureImage.width / signatureImage.height
+        imageWidth = Math.min(imageMaxWidth, signatureImage.width)
+        imageHeight = imageWidth / ratio
+        if (imageHeight > imageMaxHeight) {
+          imageHeight = imageMaxHeight
+          imageWidth = imageHeight * ratio
+        }
+      }
+
+      const blockHeight = (includeImage && signatureImage ? imageHeight + imageGap : 0)
+        + labelOffset
+        + (name ? nameOffset : 0)
+        + signatureGap
+      addPageIfNeeded(blockHeight)
+
+      const lineY = cursorY + (includeImage && signatureImage ? imageHeight + imageGap : 0)
+      if (includeImage && signatureImage) {
+        const imageX = (pageWidth - imageWidth) / 2
+        const imageY = lineY - imageHeight - imageGap
+        pdf.addImage(signatureImage.dataUrl, 'PNG', imageX, imageY, imageWidth, imageHeight)
+      }
+
+      pdf.line(signatureLineX, lineY, signatureLineX + signatureLineWidth, lineY)
+
+      const labelWidth = pdf.getTextWidth(label)
+      pdf.text(label, (pageWidth - labelWidth) / 2, lineY + labelOffset)
+
+      if (name) {
+        const nameWidth = pdf.getTextWidth(name)
+        pdf.text(name, (pageWidth - nameWidth) / 2, lineY + labelOffset + nameOffset)
+        cursorY = lineY + labelOffset + nameOffset + signatureGap
+      } else {
+        cursorY = lineY + labelOffset + signatureGap
+      }
+    }
+
+    drawSignatureBlock('Contratante', null, false)
+    drawSignatureBlock('Contratada', 'Izalana Pereira Nepomuceno - CRP 11/20792', true)
+
+    pdf.save(fileName)
+  }
 
   if (loading) {
     return (
@@ -215,6 +479,14 @@ export default function Patients() {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
+                    <button
+                      onClick={() => { void handleGenerateContract(patient) }}
+                      className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Gerar contrato"
+                      aria-label="Gerar contrato"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </button>
                     {patient.active ? (
                       <button
                         onClick={() => handleDeactivate(patient)}
@@ -318,11 +590,9 @@ function PatientModal({
     auto_renew_sessions: patient?.auto_renew_sessions ?? false
   })
   
-  const [sessionSchedules, setSessionSchedules] = useState<Array<{
-    dayOfWeek: number,
-    time: string,
-    paymentStatus: 'paid' | 'pending'
-  }>>(patient?.session_schedules || [])
+  const [sessionSchedules, setSessionSchedules] = useState<SessionSchedule[]>(
+    (patient?.session_schedules as SessionSchedule[] | undefined) || []
+  )
   
   const isNewPatient = !patient
   const [manageAutoSessions, setManageAutoSessions] = useState(
