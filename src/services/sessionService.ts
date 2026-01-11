@@ -291,7 +291,7 @@ export const sessionService = {
    * @param id O ID da sessão a ser atualizada.
    * @param updates Um objeto com os campos a serem atualizados.
    * @returns Uma Promise que resolve para o objeto Session atualizado.
-   * @throws Erro se a atualização falhar.
+   * @throws Erro se a atualização falhar. 
    */
   async updateSession(id: string, updates: Partial<Session>): Promise<Session> {
     const updateData = { ...updates }
