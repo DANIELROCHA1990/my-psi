@@ -92,7 +92,7 @@ export default function Patients() {
   }
 
   const contractClauses = [
-    '1. O processo de psicoterapia iniciara a partir da autorizacao de um(a) dos(as) responsaveis da crianca ou adolescente. O processo se dara em medio a longo prazo. Afirma-se o sigilo profissional dos atendimentos, no qual nao ha violacao dos dados, ou seja, informacoes obtidas nos atendimentos com o(a) paciente para outrem. (Com excecao em casos do(a) paciente colocar a propria vida em risco ou de outrem).',
+    '1. O processo de psicoterapia iniciara a partir da autorizacao de um(a) dos(as) responsaveis da crianca ou adolescente. O processo se dara em medio a longo prazo. Afirma-se o sigilo profissional dos atendimentos, no qual nao ha violacao dos dados, ou seja, informacoes obtidas nos atendimentos com o(a) paciente para outrem (Com excecao em casos do(a) paciente colocar a propria vida em risco ou de outrem).',
     '2. O processo deve ser iniciado a partir da entrevista com pais e/ou responsaveis da crianca ou adolescente, recolhendo as principais informacoes e os motivos para iniciar o processo. As entrevistas com os pais e/ou responsaveis deve ser realizada de forma periodica a medida que a profissional sinta necessidade, ou ainda que os proprios responsaveis do(a) paciente solicitem.',
     '2.1. O atendimento com os responsaveis do(a) adolescente acontecera mediante aos acordos feitos entre paciente e a profissional, caso lhe for pertinente.',
     '3. Os atendimentos terao frequencia de, no minimo, uma vez por semana, em horario e dia preestabelecidos por todas as partes. Podendo passar por alteracoes e/ou aumento de sessoes semanais, caso haja necessidade clinica.',
@@ -153,9 +153,9 @@ export default function Patients() {
       .replace(/(^-|-$)/g, '')
     const fileName = `contrato-${slug || 'paciente'}.pdf`
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
-    const margin = 48
-    const lineHeight = 16
-    const sectionGap = 10
+    const margin = 36
+    const lineHeight = 14
+    const sectionGap = 6
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
     const maxWidth = pageWidth - margin * 2
@@ -170,7 +170,7 @@ export default function Patients() {
     }
 
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(11)
+    pdf.setFontSize(10)
     pdf.setTextColor(0, 0, 0)
 
     const addPageIfNeeded = (height: number = 0) => {
@@ -191,45 +191,52 @@ export default function Patients() {
 
     const addTitle = (text: string) => {
       pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(16)
+      pdf.setFontSize(14)
       const textWidth = pdf.getTextWidth(text)
       addPageIfNeeded(lineHeight)
       pdf.text(text, (pageWidth - textWidth) / 2, cursorY)
-      cursorY += lineHeight + 12
+      cursorY += lineHeight + 8
       pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(11)
+      pdf.setFontSize(10)
     }
 
-    const addSectionTitle = (text: string) => {
+    const addSectionTitle = (text: string, showLine: boolean = true) => {
       addPageIfNeeded(lineHeight * 2)
       pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(12)
+      pdf.setFontSize(11)
       pdf.text(text, margin, cursorY)
+      if (showLine) {
+        const lineY = cursorY - 12
+        pdf.setDrawColor(220)
+        pdf.line(margin, lineY, pageWidth - margin, lineY)
+      }
       cursorY += lineHeight
-      pdf.setDrawColor(220)
-      pdf.line(margin, cursorY, pageWidth - margin, cursorY)
       cursorY += sectionGap
       pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(11)
+      pdf.setFontSize(10)
     }
 
     addTitle('CONTRATO DE PRESTACAO DE SERVICOS PSICOLOGICOS')
 
-    addSectionTitle('DADOS DO PACIENTE')
+    addSectionTitle('DADOS DO PACIENTE', false)
+    const addressLineParts = [
+      patient.address,
+      (patient.city || patient.state) ? [patient.city, patient.state].filter(Boolean).join(' - ') : null,
+      patient.zip_code ? `CEP ${patient.zip_code}` : null
+    ].filter(Boolean)
+
     const patientInfoLines = [
       `Nome: ${patient.full_name}`,
       patient.email ? `Email: ${patient.email}` : null,
       patient.phone ? `Telefone: ${patient.phone}` : null,
       formatBirthDate(patient.birth_date) ? `Data de nascimento: ${formatBirthDate(patient.birth_date)}` : null,
-      patient.address ? `Endereco: ${patient.address}` : null,
-      (patient.city || patient.state) ? `Cidade/UF: ${[patient.city, patient.state].filter(Boolean).join(' - ')}` : null,
-      patient.zip_code ? `CEP: ${patient.zip_code}` : null
+      addressLineParts.length ? `Endereco: ${addressLineParts.join(', ')}` : null
     ].filter(Boolean) as string[]
 
     patientInfoLines.forEach((line) => addWrappedLines(line))
     cursorY += sectionGap
 
-    addSectionTitle('CONFIGURACOES DE SESSAO')
+    addSectionTitle('FREQUENCIA DAS SESSOES')
     addWrappedLines(`Frequencia: ${frequencyLabels[patient.session_frequency] || patient.session_frequency}`)
     if (patient.session_price !== null && patient.session_price !== undefined) {
       addWrappedLines(`Valor da sessao: R$ ${Number(patient.session_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
@@ -237,11 +244,11 @@ export default function Patients() {
     cursorY += sectionGap
 
     if (patient.session_schedules && patient.session_schedules.length) {
-      addSectionTitle('AGENDAMENTOS AUTOMATICOS')
+      addSectionTitle('HORARIOS DAS SESSOES')
       patient.session_schedules.forEach((schedule) => {
         const pieces = [
           getDayLabel(schedule.dayOfWeek),
-          schedule.time
+          `${schedule.time} Hrs`
         ]
         if (schedule.sessionType) {
           pieces.push(schedule.sessionType)
@@ -252,10 +259,7 @@ export default function Patients() {
         if (schedule.sessionPrice !== null && schedule.sessionPrice !== undefined) {
           pieces.push(`R$ ${Number(schedule.sessionPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
         }
-        if (schedule.paymentStatus) {
-          pieces.push(paymentStatusLabels[schedule.paymentStatus] || schedule.paymentStatus)
-        }
-        addWrappedLines(`- ${pieces.join(' | ')}`, 12)
+        addWrappedLines(`- ${pieces.join(' às ')}`, 12)
       })
       cursorY += sectionGap
     }
@@ -263,20 +267,20 @@ export default function Patients() {
     addSectionTitle('CLAUSULAS')
     contractClauses.forEach((clause) => {
       addWrappedLines(clause)
-      cursorY += 6
+      cursorY += 3
     })
 
-    cursorY += sectionGap
+    cursorY += sectionGap * 2
     addWrappedLines('Quaisquer duvidas, fico a disposicao para esclarecimentos.')
-    cursorY += sectionGap
-    addWrappedLines('Local e data: ______________________________')
-    cursorY += lineHeight * 2
+    cursorY += sectionGap * 6
+    addWrappedLines('Local e data: _________________,________________________________de________')
+    cursorY += lineHeight * 5
 
     const signatureLineWidth = 240
     const signatureLineX = (pageWidth - signatureLineWidth) / 2
     const labelOffset = 14
     const nameOffset = 14
-    const signatureGap = 28
+    const signatureGap = 20
     const imageGap = 8
     const imageMaxWidth = signatureLineWidth
     const imageMaxHeight = 56
@@ -586,6 +590,7 @@ function PatientModal({
     therapy_goals: patient?.therapy_goals || '',
     session_frequency: patient?.session_frequency || 'weekly',
     session_price: patient?.session_price?.toString() || '',
+    session_link: patient?.session_link || '',
     active: patient?.active ?? true,
     auto_renew_sessions: patient?.auto_renew_sessions ?? false
   })
@@ -595,6 +600,7 @@ function PatientModal({
   )
   
   const isNewPatient = !patient
+  const [hasSessionLink, setHasSessionLink] = useState(!!patient?.session_link)
   const [manageAutoSessions, setManageAutoSessions] = useState(
     isNewPatient || forceManageAutoSessions || (patient?.session_schedules?.length ?? 0) > 0
   )
@@ -628,6 +634,17 @@ function PatientModal({
     setSessionSchedules(updated)
   }
 
+  const normalizeSchedulesForCompare = (schedules: SessionSchedule[]) => {
+    return schedules.map(schedule => ({
+      dayOfWeek: schedule.dayOfWeek,
+      time: schedule.time,
+      paymentStatus: schedule.paymentStatus,
+      sessionType: schedule.sessionType || null,
+      durationMinutes: schedule.durationMinutes ?? null,
+      sessionPrice: schedule.sessionPrice ?? null
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -643,6 +660,7 @@ function PatientModal({
         ...formData,
         session_schedules: sessionSchedules.length > 0 ? sessionSchedules : patient?.session_schedules || null,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
+        session_link: hasSessionLink ? (formData.session_link?.trim() || null) : null,
         birth_date: formData.birth_date || undefined,
         email: formData.email || undefined,
         phone: formData.phone || undefined,
@@ -658,10 +676,15 @@ function PatientModal({
         therapy_goals: formData.therapy_goals || undefined
       }
 
+      const schedulesChanged = patient
+        ? JSON.stringify(normalizeSchedulesForCompare(sessionSchedules)) !==
+          JSON.stringify(normalizeSchedulesForCompare((patient.session_schedules as SessionSchedule[] | undefined) || []))
+        : true
+
       if (patient) {
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
-        if (manageAutoSessions && sessionSchedules.length > 0) {
+        if (manageAutoSessions && sessionSchedules.length > 0 && schedulesChanged) {
           try {
             await sessionService.replaceFutureSessions(
               patient.id,
@@ -930,7 +953,7 @@ function PatientModal({
           
           {/* Session Settings */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Configurações de Sessão</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Frequência de Sessão</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -962,6 +985,45 @@ function PatientModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Valor que será usado em todas as sessões"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900">Possui link?</h4>
+                    <p className="text-sm text-gray-600">
+                      Informe um link de atendimento para aparecer na agenda.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasSessionLink}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setHasSessionLink(checked)
+                        if (!checked) {
+                          setFormData(prev => ({ ...prev, session_link: '' }))
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                {hasSessionLink && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Link do atendimento
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.session_link}
+                      onChange={(e) => setFormData(prev => ({ ...prev, session_link: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      placeholder="https://"
+                    />
+                  </div>
+                )}
               </div>
               <div className="md:col-span-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

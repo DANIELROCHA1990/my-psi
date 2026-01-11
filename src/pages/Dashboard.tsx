@@ -23,7 +23,8 @@ export default function Dashboard() {
     activePatients: 0,
     upcomingSessions: 0,
     weeklyRevenue: 0,
-    monthlyRevenue: 0
+    monthlyRevenue: 0,
+    receivableAmount: 0
   })
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([])
   const [recentTransactions, setRecentTransactions] = useState<FinancialRecord[]>([])
@@ -41,23 +42,30 @@ export default function Dashboard() {
       const patients = await patientService.getPatients()
       const activePatients = patients.filter(p => p.active)
       
-      // Load upcoming sessions
-      const sessions = await sessionService.getUpcomingSessions()
+      const [sessions, upcomingSessions] = await Promise.all([
+        sessionService.getSessions(),
+        sessionService.getUpcomingSessions()
+      ])
       
       // Load financial data
       const weeklyRevenue = await financialService.getWeeklyRevenue()
       const monthlyRevenue = await financialService.getMonthlyRevenue()
       const transactions = await financialService.getFinancialRecords()
       
+      const receivableAmount = sessions
+        .filter(session => session.payment_status === 'pending')
+        .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
+
       setStats({
         totalPatients: patients.length,
         activePatients: activePatients.length,
-        upcomingSessions: sessions.length,
+        upcomingSessions: upcomingSessions.length,
         weeklyRevenue,
-        monthlyRevenue
+        monthlyRevenue,
+        receivableAmount
       })
       
-      setUpcomingSessions(sessions)
+      setUpcomingSessions(upcomingSessions)
       setRecentTransactions(transactions.slice(0, 5))
     } catch (error) {
       console.error('Error loading dashboard data:', error)
@@ -85,39 +93,39 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-emerald-50 p-3 rounded-lg">
               <Users className="h-6 w-6 text-emerald-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Pacientes Ativos</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.activePatients}</p>
+              <p className="text-xl font-bold text-gray-900">{stats.activePatients}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-green-50 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-green-600" />
+              <Calendar className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Próximas Sessões</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.upcomingSessions}</p>
+              <p className="text-xl font-bold text-gray-900">{stats.upcomingSessions}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-yellow-50 p-3 rounded-lg">
               <DollarSign className="h-6 w-6 text-yellow-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Semanal</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.weeklyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -125,14 +133,28 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-purple-50 p-3 rounded-lg">
               <TrendingUp className="h-6 w-6 text-purple-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Mensal</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <AlertCircle className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-600">A Receber</p>
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
+                R$ {stats.receivableAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -235,41 +257,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Ações Rápidas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-colors group">
-            <div className="text-center">
-              <Users className="h-8 w-8 text-gray-400 group-hover:text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600 group-hover:text-emerald-600">
-                Novo Paciente
-              </p>
-            </div>
-          </button>
-          
-          <button className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors group">
-            <div className="text-center">
-              <Calendar className="h-8 w-8 text-gray-400 group-hover:text-green-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600 group-hover:text-green-600">
-                Agendar Sessão
-              </p>
-            </div>
-          </button>
-          
-          <button className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition-colors group">
-            <div className="text-center">
-              <DollarSign className="h-8 w-8 text-gray-400 group-hover:text-yellow-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600 group-hover:text-yellow-600">
-                Registrar Pagamento
-              </p>
-            </div>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
-
-

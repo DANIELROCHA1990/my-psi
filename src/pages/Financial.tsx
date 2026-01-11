@@ -3,7 +3,7 @@ import { financialService } from '../services/financialService'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { FinancialRecord, Patient, Session } from '../types'
-import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, FileText } from 'lucide-react'
+import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, FileText, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, subMonths, subYears } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -177,6 +177,10 @@ export default function Financial() {
 
   const statusChartSessions = sessionsInRange.filter((session) => session.session_price !== null && session.session_price !== undefined)
 
+  const pendingReceivable = sessionsInRange
+    .filter((session) => session.payment_status === 'pending')
+    .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
+
   const revenueSessions = statusChartSessions.filter((session) => {
     if (sessionStatusFilter === 'all') {
       return session.payment_status === 'paid'
@@ -330,15 +334,15 @@ export default function Financial() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-green-50 p-3 rounded-lg">
               <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Semanal</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.weeklyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -346,13 +350,13 @@ export default function Financial() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-emerald-50 p-3 rounded-lg">
-              <DollarSign className="h-6 w-6 text-emerald-600" />
+              <DollarSign className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Mensal</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -360,13 +364,13 @@ export default function Financial() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-red-50 p-3 rounded-lg">
               <TrendingDown className="h-6 w-6 text-red-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Despesas Semanais</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.weeklyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -374,16 +378,30 @@ export default function Financial() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <div className="bg-purple-50 p-3 rounded-lg">
               <Calendar className="h-6 w-6 text-purple-600" />
             </div>
-            <div className="ml-4">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Saldo Mensal</p>
-              <p className={`text-2xl font-bold ${
+              <p className={`text-xl font-bold whitespace-nowrap ${
                 (stats.monthlyRevenue - stats.monthlyExpenses) >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
                 R$ {(stats.monthlyRevenue - stats.monthlyExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-600">A Receber</p>
+              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
+                R$ {pendingReceivable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
