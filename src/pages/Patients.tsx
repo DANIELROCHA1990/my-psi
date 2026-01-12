@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react'
 import { patientService } from '../services/patientService'
+import { profileService } from '../services/profileService'
 import { sessionService } from '../services/sessionService'
-import { Patient, SessionSchedule } from '../types'
+import { Patient, Profile, SessionSchedule } from '../types'
 import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -12,6 +13,7 @@ import { jsPDF } from 'jspdf'
 export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
@@ -19,6 +21,7 @@ export default function Patients() {
 
   useEffect(() => {
     loadPatients()
+    loadProfile()
   }, [])
 
   const loadPatients = async () => {
@@ -31,6 +34,11 @@ export default function Patients() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadProfile = async () => {
+    const data = await profileService.getProfile()
+    setProfile(data)
   }
 
   const handleDeactivate = async (patient: Patient) => {
@@ -127,17 +135,20 @@ export default function Patients() {
   }
 
   const loadSignatureImage = async (src: string) => {
-    const response = await fetch(src)
-    if (!response.ok) {
-      throw new Error('Erro ao carregar assinatura')
+    let dataUrl = src
+    if (!src.startsWith('data:')) {
+      const response = await fetch(src)
+      if (!response.ok) {
+        throw new Error('Erro ao carregar assinatura')
+      }
+      const blob = await response.blob()
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Erro ao ler assinatura'))
+        reader.readAsDataURL(blob)
+      })
     }
-    const blob = await response.blob()
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => reject(new Error('Erro ao ler assinatura'))
-      reader.readAsDataURL(blob)
-    })
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image()
       image.onload = () => resolve(image)
@@ -160,14 +171,31 @@ export default function Patients() {
     const pageHeight = pdf.internal.pageSize.getHeight()
     const maxWidth = pageWidth - margin * 2
     let cursorY = margin
-    const signatureImageUrl = new URL('../public/20260111_133550-removebg-preview.png', import.meta.url).toString()
+    let contractProfile = profile
+
+    if (!contractProfile) {
+      contractProfile = await profileService.getProfile()
+      setProfile(contractProfile)
+    }
+
+    const contractorName = contractProfile?.full_name?.trim() || ''
+    const contractorCrp = contractProfile?.crp_number?.trim() || ''
+    const contractorLineWithCrp = [
+      contractorName ? contractorName : null,
+      contractorCrp ? `CRP ${contractorCrp}` : null
+    ].filter(Boolean).join(' - ')
+    const signatureData = contractProfile?.signature_data?.trim() || ''
     let signatureImage: { dataUrl: string; width: number; height: number } | null = null
 
-    try {
-      signatureImage = await loadSignatureImage(signatureImageUrl)
-    } catch (error) {
-      signatureImage = null
+    if (signatureData) {
+      try {
+        signatureImage = await loadSignatureImage(signatureData)
+      } catch (error) {
+        signatureImage = null
+      }
     }
+
+    const contractorLine = signatureImage ? contractorLineWithCrp : contractorName
 
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
@@ -330,7 +358,7 @@ export default function Patients() {
     }
 
     drawSignatureBlock('Contratante', null, false)
-    drawSignatureBlock('Contratada', 'Izalana Pereira Nepomuceno - CRP 11/20792', true)
+    drawSignatureBlock('Contratada', contractorLine || null, Boolean(signatureImage))
 
     pdf.save(fileName)
   }

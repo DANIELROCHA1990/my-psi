@@ -2,6 +2,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { authService } from '../../services/authService'
+import { profileService } from '../../services/profileService'
 import {
   Brain,
   LayoutDashboard,
@@ -42,12 +43,25 @@ export default function Layout({ children }: LayoutProps) {
     }
     return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false
   })
+  const [profileName, setProfileName] = useState('')
 
   useEffect(() => {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
+
+  useEffect(() => {
+    const loadProfileName = async () => {
+      if (!user) {
+        setProfileName('')
+        return
+      }
+      const profile = await profileService.getProfile()
+      setProfileName(profile?.full_name?.trim() || '')
+    }
+    loadProfileName()
+  }, [user?.id])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -73,6 +87,10 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Financeiro', href: '/financial', icon: Wallet },
     { name: 'Configuracoes', href: '/settings', icon: SlidersHorizontal }
   ]
+
+  const displayName = profileName
+    ? profileName.split(/\s+/)[0]
+    : (user?.email || '')
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -139,11 +157,11 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center">
               <div className="bg-gray-200 rounded-full h-10 w-10 flex items-center justify-center">
                 <span className="text-sm font-medium text-gray-700">
-                  {user?.email?.charAt(0).toUpperCase()}
+                  {(displayName || '?').charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700 truncate">{user?.email}</p>
+                <p className="text-sm font-medium text-gray-700 truncate">{displayName}</p>
                 <button
                   onClick={handleSignOut}
                   className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
@@ -231,7 +249,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className={`flex items-center ${sidebarCollapsed ? 'flex-col gap-3' : 'w-full'}`}>
               <div className="bg-gray-200 rounded-full h-10 w-10 flex items-center justify-center">
                 <span className="text-sm font-medium text-gray-700">
-                  {user?.email?.charAt(0).toUpperCase()}
+                  {(displayName || '?').charAt(0).toUpperCase()}
                 </span>
               </div>
               {sidebarCollapsed ? (
@@ -244,7 +262,7 @@ export default function Layout({ children }: LayoutProps) {
                 </button>
               ) : (
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-700 truncate">{user?.email}</p>
+                  <p className="text-sm font-medium text-gray-700 truncate">{displayName}</p>
                   <button
                     onClick={handleSignOut}
                     className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
