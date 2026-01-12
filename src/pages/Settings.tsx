@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { profileService } from '../services/profileService'
 import { authService } from '../services/authService'
@@ -19,6 +19,7 @@ export default function Settings() {
     full_name: '',
     specialty: '',
     crp_number: '',
+    signature_data: '',
     phone: '',
     email: '',
     address: '',
@@ -49,8 +50,9 @@ export default function Settings() {
           full_name: profileData.full_name || '',
           specialty: profileData.specialty || '',
           crp_number: profileData.crp_number || '',
+          signature_data: profileData.signature_data || '',
           phone: profileData.phone || '',
-          email: profileData.email || user?.email || '',
+          email: user?.email || profileData.email || '',
           address: profileData.address || '',
           city: profileData.city || '',
           state: profileData.state || '',
@@ -68,6 +70,29 @@ export default function Settings() {
     }
   }
 
+  const handleSignatureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'image/png') {
+      toast.error('Envie um arquivo PNG.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setProfileData(prev => ({ ...prev, signature_data: reader.result as string }))
+    }
+    reader.onerror = () => {
+      toast.error('Erro ao carregar assinatura')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSignatureRemove = () => {
+    setProfileData(prev => ({ ...prev, signature_data: '' }))
+  }
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -75,6 +100,7 @@ export default function Settings() {
     try {
       const data = {
         ...profileData,
+        email: user?.email || profileData.email,
         session_price: profileData.session_price ? Number(profileData.session_price) : null,
         user_id: user?.id || ''
       }
@@ -100,7 +126,7 @@ export default function Settings() {
     e.preventDefault()
     
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('As senhas não coincidem')
+      toast.error('As senhas nao coincidem')
       return
     }
 
@@ -140,8 +166,8 @@ export default function Settings() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e preferências.</p>
+        <h1 className="text-3xl font-bold text-gray-900">Configuracoes</h1>
+        <p className="text-gray-600 mt-2">Gerencie suas informacoes pessoais e preferencias.</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -182,7 +208,7 @@ export default function Settings() {
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Pessoais</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Informacoes Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -237,13 +263,13 @@ export default function Settings() {
                       value={profileData.specialty}
                       onChange={(e) => setProfileData(prev => ({ ...prev, specialty: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      placeholder="Ex: Psicologia Clínica, Terapia Cognitiva..."
+                      placeholder="Ex: Psicologia Clinica, Terapia Cognitiva..."
                     />
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Número CRP
+                      Numero CRP
                     </label>
                     <input
                       type="text"
@@ -253,10 +279,10 @@ export default function Settings() {
                       placeholder="Ex: 12/34567"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Valor Padrão da Sessão (R$)
+                      Valor Padrao da Sessao (R$)
                     </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -270,15 +296,47 @@ export default function Settings() {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Inserir assinatura (PNG)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png"
+                      onChange={handleSignatureChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                    {profileData.signature_data && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <img
+                          src={profileData.signature_data}
+                          alt="Assinatura"
+                          className="h-12 w-auto"
+                        />
+                        <span className="text-sm text-gray-500">Assinatura carregada</span>
+                      </div>
+                    )}
+                    {profileData.signature_data && (
+                      <button
+                        type="button"
+                        onClick={handleSignatureRemove}
+                        className="mt-3 px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Remover assinatura
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               
+
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Endereço</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Endereco</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Endereço
+                      Endereco
                     </label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
@@ -287,7 +345,7 @@ export default function Settings() {
                         value={profileData.address}
                         onChange={(e) => setProfileData(prev => ({ ...prev, address: e.target.value }))}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="Rua, número, complemento..."
+                        placeholder="Rua, numero, complemento..."
                       />
                     </div>
                   </div>

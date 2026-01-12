@@ -11,6 +11,7 @@ export interface Profile {
   full_name: string
   specialty?: string
   crp_number?: string
+  signature_data?: string | null
   phone?: string
   email?: string
   address?: string
