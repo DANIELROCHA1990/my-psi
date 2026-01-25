@@ -255,7 +255,12 @@ export default function Financial() {
   const statusChartSessions = sessionsInRange.filter((session) => session.session_price !== null && session.session_price !== undefined)
 
   const pendingReceivable = sessionsInRange
-    .filter((session) => session.payment_status === 'paid' || session.payment_status === 'pending')
+    .filter((session) => {
+      if (dateRange === 'month') {
+        return session.payment_status === 'pending'
+      }
+      return session.payment_status === 'paid' || session.payment_status === 'pending'
+    })
     .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
   const revenueSessions = statusChartSessions.filter((session) => {
