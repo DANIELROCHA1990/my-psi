@@ -68,6 +68,7 @@ const fetchSessions = async (): Promise<Session[]> => {
         email,
         phone,
         session_link,
+        calendar_color,
         active,
         session_frequency,
         session_price,
@@ -203,6 +204,7 @@ export const sessionService = {
           email,
           phone,
           session_link,
+          calendar_color,
           active,
           session_frequency,
           session_price,
@@ -244,6 +246,7 @@ export const sessionService = {
           state,
           zip_code,
           session_link,
+          calendar_color,
           emergency_contact,
           emergency_phone,
           medical_history,
@@ -293,7 +296,8 @@ export const sessionService = {
           full_name,
           email,
           phone,
-          session_link
+          session_link,
+          calendar_color
         )
       `)
       .single()
@@ -331,7 +335,8 @@ export const sessionService = {
           full_name,
           email,
           phone,
-          session_link
+          session_link,
+          calendar_color
         )
       `)
       .single()
@@ -357,7 +362,8 @@ export const sessionService = {
                 full_name,
                 email,
                 phone,
-                session_link
+                session_link,
+                calendar_color
               )
             `)
             .single()
@@ -512,7 +518,8 @@ export const sessionService = {
           full_name,
           email,
           phone,
-          session_link
+          session_link,
+          calendar_color
         )
       `)
     
@@ -546,7 +553,8 @@ export const sessionService = {
           full_name,
           email,
           phone,
-          session_link
+          session_link,
+          calendar_color
         )
       `)
 
@@ -576,7 +584,8 @@ export const sessionService = {
               full_name,
               email,
               phone,
-              session_link
+              session_link,
+              calendar_color
             )
           `)
 

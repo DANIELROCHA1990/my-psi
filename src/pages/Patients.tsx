@@ -601,6 +601,18 @@ function PatientModal({
   onSave: () => void
   forceManageAutoSessions?: boolean
 }) {
+  const normalizeHexColorValue = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return ''
+    }
+    const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+    return withHash.toLowerCase()
+  }
+
+  const isValidHexColor = (value: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(value)
+
+  const initialCalendarColor = patient?.calendar_color ?? (patient ? '' : '#10b981')
   const [formData, setFormData] = useState({
     full_name: patient?.full_name || '',
     email: patient?.email || '',
@@ -620,7 +632,8 @@ function PatientModal({
     session_price: patient?.session_price?.toString() || '',
     session_link: patient?.session_link || '',
     active: patient?.active ?? true,
-    auto_renew_sessions: patient?.auto_renew_sessions ?? false
+    auto_renew_sessions: patient?.auto_renew_sessions ?? false,
+    calendar_color: initialCalendarColor
   })
   
   const [sessionSchedules, setSessionSchedules] = useState<SessionSchedule[]>(
@@ -633,6 +646,8 @@ function PatientModal({
     isNewPatient || forceManageAutoSessions || (patient?.session_schedules?.length ?? 0) > 0
   )
   const [loading, setLoading] = useState(false)
+  const normalizedCalendarColor = normalizeHexColorValue(formData.calendar_color)
+  const calendarColorValid = normalizedCalendarColor ? isValidHexColor(normalizedCalendarColor) : true
   
   const daysOfWeek = [
     { value: 1, label: 'Segunda-feira' },
@@ -642,6 +657,17 @@ function PatientModal({
     { value: 5, label: 'Sexta-feira' },
     { value: 6, label: 'Sábado' },
     { value: 0, label: 'Domingo' }
+  ]
+
+  const calendarColorOptions = [
+    { label: 'Verde', value: '#10b981' },
+    { label: 'Azul', value: '#3b82f6' },
+    { label: 'Laranja', value: '#f97316' },
+    { label: 'Rosa', value: '#ec4899' },
+    { label: 'Roxo', value: '#8b5cf6' },
+    { label: 'Amarelo', value: '#f59e0b' },
+    { label: 'Turquesa', value: '#14b8a6' },
+    { label: 'Vermelho', value: '#ef4444' }
   ]
   
   const addSchedule = () => {
@@ -680,6 +706,10 @@ function PatientModal({
       toast.error('Nome é obrigatório')
       return
     }
+    if (!calendarColorValid) {
+      toast.error('Cor invalida. Use #RGB ou #RRGGBB.')
+      return
+    }
     
     setLoading(true)
 
@@ -689,6 +719,7 @@ function PatientModal({
         session_schedules: sessionSchedules.length > 0 ? sessionSchedules : patient?.session_schedules || null,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         session_link: hasSessionLink ? (formData.session_link?.trim() || null) : null,
+        calendar_color: normalizedCalendarColor || null,
         birth_date: formData.birth_date || undefined,
         email: formData.email || undefined,
         phone: formData.phone || undefined,
@@ -851,6 +882,59 @@ function PatientModal({
                   <option value="true">Ativo</option>
                   <option value="false">Inativo</option>
                 </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cor na agenda
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {calendarColorOptions.map(option => {
+                    const isSelected = normalizedCalendarColor === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, calendar_color: option.value }))}
+                        className={`h-8 w-8 rounded-full border ${isSelected ? 'ring-2 ring-emerald-500 ring-offset-1' : 'border-gray-300'}`}
+                        style={{ backgroundColor: option.value }}
+                        title={option.label}
+                        aria-label={`Cor ${option.label}`}
+                      />
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, calendar_color: '' }))}
+                    className="px-3 py-1 text-xs border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50"
+                  >
+                    Sem cor
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Hex
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.calendar_color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, calendar_color: e.target.value }))}
+                      placeholder="#10b981"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Use #RGB ou #RRGGBB</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Preview
+                    </label>
+                    <div
+                      className="h-10 rounded-lg border border-gray-200"
+                      style={{ backgroundColor: calendarColorValid ? (normalizedCalendarColor || '#f3f4f6') : '#f3f4f6' }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
