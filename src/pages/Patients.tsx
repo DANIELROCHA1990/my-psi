@@ -708,11 +708,19 @@ function PatientModal({
         ? JSON.stringify(normalizeSchedulesForCompare(sessionSchedules)) !==
           JSON.stringify(normalizeSchedulesForCompare((patient.session_schedules as SessionSchedule[] | undefined) || []))
         : true
+      const deactivatingPatient = Boolean(patient?.active && patientData.active === false)
 
       if (patient) {
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
-        if (manageAutoSessions && sessionSchedules.length > 0 && schedulesChanged) {
+        if (deactivatingPatient) {
+          const { error: deactivateError } = await patientService.deactivatePatient(patient.id)
+          if (deactivateError) {
+            toast.error('Paciente atualizado, mas erro ao apagar sessoes futuras')
+          } else {
+            toast.success('Paciente inativado e sessoes futuras removidas')
+          }
+        } else if (manageAutoSessions && sessionSchedules.length > 0 && schedulesChanged) {
           try {
             await sessionService.replaceFutureSessions(
               patient.id,
@@ -731,7 +739,7 @@ function PatientModal({
         if (error) throw error
         
         // Se deve criar sessões automaticamente
-        if (manageAutoSessions && sessionSchedules.length > 0) {
+        if (manageAutoSessions && sessionSchedules.length > 0 && patientData.active !== false) {
           try {
             await sessionService.createMultipleSessions(
               newPatient?.id || '',
