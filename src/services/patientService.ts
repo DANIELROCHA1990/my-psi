@@ -91,28 +91,41 @@ export const patientService = {
     }
 
     const nowIso = new Date().toISOString()
-    const today = nowIso.slice(0, 10)
 
-    const [{ error: sessionsError }, { error: financialError }] = await Promise.all([
-      supabase
-        .from('sessions')
-        .delete()
-        .eq('patient_id', id)
-        .gte('session_date', nowIso),
-      supabase
+    const { data: futureSessions, error: futureSessionsError } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('patient_id', id)
+      .gte('session_date', nowIso)
+
+    if (futureSessionsError) {
+      console.error('Error fetching future sessions for patient:', futureSessionsError)
+    }
+
+    const futureSessionIds = (futureSessions || []).map((session) => session.id)
+    let financialError: typeof futureSessionsError = null
+
+    if (futureSessionIds.length > 0) {
+      const { error } = await supabase
         .from('financial_records')
         .delete()
-        .eq('patient_id', id)
-        .gte('transaction_date', today)
-    ])
+        .in('session_id', futureSessionIds)
+      financialError = error
+      if (financialError) {
+        console.error('Error deleting future financial records for patient:', financialError)
+      }
+    }
+
+    const { error: sessionsError } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('patient_id', id)
+      .gte('session_date', nowIso)
 
     if (sessionsError) {
       console.error('Error deleting future sessions for patient:', sessionsError)
     }
-    if (financialError) {
-      console.error('Error deleting future financial records for patient:', financialError)
-    }
 
-    return { error: sessionsError || financialError }
+    return { error: sessionsError || financialError || futureSessionsError }
   }
 }

@@ -44,6 +44,19 @@ function normalizeSessionDateValue(value: string | Date): string {
   return toISOStringUTC(parsed)
 }
 
+function getFrequencyIntervalWeeks(frequency?: string) {
+  switch (frequency) {
+    case 'biweekly':
+      return 2
+    case 'monthly':
+      return 4
+    case 'as_needed':
+      return 0
+    default:
+      return 1
+  }
+}
+
 const fetchSessions = async (): Promise<Session[]> => {
   const { data, error } = await supabase
     .from('sessions')
@@ -109,6 +122,9 @@ const autoRenewSessionsIfNeeded = async (sessions: Session[]) => {
   sessions.forEach((session) => {
     const patient = session.patients
     if (!patient?.auto_renew_sessions || patient.active === false) {
+      return
+    }
+    if (patient.session_frequency === 'as_needed') {
       return
     }
 
@@ -324,7 +340,47 @@ export const sessionService = {
       throw new Error(`Failed to update session: ${error.message}`)
     }
 
-    return data
+    let updatedSession = data
+
+    if (updates.payment_status === 'cancelled') {
+      const sessionDate = parseISO(updatedSession.session_date)
+      if (sessionDate >= new Date()) {
+        if (updatedSession.session_price !== null && updatedSession.session_price !== undefined) {
+          const { data: clearedSession, error: clearError } = await supabase
+            .from('sessions')
+            .update({ session_price: null })
+            .eq('id', id)
+            .select(`
+              *,
+              patients (
+                id,
+                full_name,
+                email,
+                phone,
+                session_link
+              )
+            `)
+            .single()
+
+          if (clearError) {
+            console.error('Error clearing session price for cancelled session:', clearError)
+          } else {
+            updatedSession = clearedSession
+          }
+        }
+
+        const { error: financialError } = await supabase
+          .from('financial_records')
+          .delete()
+          .eq('session_id', id)
+
+        if (financialError) {
+          console.error('Error deleting financial record for cancelled session:', financialError)
+        }
+      }
+    }
+
+    return updatedSession
   },
 
   /**
@@ -367,9 +423,15 @@ export const sessionService = {
     // Buscar dados do paciente para pegar o preÃ§o da sessÃúo
     const { data: patient } = await supabase
       .from('patients')
-      .select('session_price')
+      .select('session_price, session_frequency')
       .eq('id', patientId)
       .single()
+
+    const frequency = patient?.session_frequency || 'weekly'
+    const intervalWeeks = getFrequencyIntervalWeeks(frequency)
+    const occurrences = intervalWeeks === 0
+      ? 1
+      : Math.max(1, Math.ceil(weeksToCreate / intervalWeeks))
     
     for (const schedule of schedules) {
       const [hours, minutes] = schedule.time.split(':').map(Number)
@@ -387,8 +449,10 @@ export const sessionService = {
 
       const firstSessionDateLocal = addDays(baseDate, daysToAdd)
 
-      for (let week = 0; week < weeksToCreate; week++) {
-        const sessionDateLocal = addWeeks(firstSessionDateLocal, week)
+      for (let occurrence = 0; occurrence < occurrences; occurrence++) {
+        const sessionDateLocal = intervalWeeks === 0
+          ? firstSessionDateLocal
+          : addWeeks(firstSessionDateLocal, occurrence * intervalWeeks)
 
         sessions.push({
           patient_id: patientId,
@@ -490,7 +554,52 @@ export const sessionService = {
       throw new Error(`Failed to update sessions status: ${error.message}`)
     }
 
-    return data || []
+    let updatedSessions = data || []
+
+    if (paymentStatus === 'cancelled') {
+      const now = new Date()
+      const futureSessions = updatedSessions.filter((session) => {
+        const sessionDate = parseISO(session.session_date)
+        return sessionDate >= now
+      })
+      const futureIds = futureSessions.map((session) => session.id)
+
+      if (futureIds.length > 0) {
+        const { data: clearedSessions, error: clearError } = await supabase
+          .from('sessions')
+          .update({ session_price: null })
+          .in('id', futureIds)
+          .select(`
+            *,
+            patients (
+              id,
+              full_name,
+              email,
+              phone,
+              session_link
+            )
+          `)
+
+        if (clearError) {
+          console.error('Error clearing session price for cancelled sessions:', clearError)
+        } else if (clearedSessions?.length) {
+          const sessionMap = new Map(updatedSessions.map((session) => [session.id, session]))
+          clearedSessions.forEach((session) => sessionMap.set(session.id, session))
+          updatedSessions = Array.from(sessionMap.values())
+        }
+
+        const { error: financialError } = await supabase
+          .from('financial_records')
+          .delete()
+          .in('session_id', futureIds)
+
+        if (financialError) {
+          console.error('Error deleting financial records for cancelled sessions:', financialError)
+        }
+      }
+    }
+
+    return updatedSessions
   },
   /**
    * Remarca uma sessao e sincroniza a data financeira quando ja estiver paga.
