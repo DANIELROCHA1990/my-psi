@@ -66,6 +66,32 @@ function normalizeSessionLink(link?: string | null): string | null {
   return `https://${trimmed}`
 }
 
+function normalizeHexColorValue(value?: string | null): string | null {
+  if (!value) {
+    return null
+  }
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  return withHash.toLowerCase()
+}
+
+function isValidHexColor(value: string): boolean {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(value)
+}
+
+function getReadableTextColor(hexColor: string): string {
+  const raw = hexColor.replace('#', '')
+  const expanded = raw.length === 3 ? raw.split('').map((char) => char + char).join('') : raw
+  const r = parseInt(expanded.slice(0, 2), 16)
+  const g = parseInt(expanded.slice(2, 4), 16)
+  const b = parseInt(expanded.slice(4, 6), 16)
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000
+  return yiq >= 160 ? '#1f2937' : '#f9fafb'
+}
+
 function SessionEditModal({
   session,
   allSessions,
@@ -320,6 +346,14 @@ export default function Calendar() {
     }
   }
 
+  const getSessionColor = (session: Session) => {
+    const normalized = normalizeHexColorValue(session.patients?.calendar_color)
+    if (!normalized || !isValidHexColor(normalized)) {
+      return null
+    }
+    return normalized
+  }
+
   const monthStart = startOfMonth(currentDate) // currentDate e um objeto Date local
   const monthEnd = endOfMonth(currentDate)     // Objeto Date local
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
@@ -454,21 +488,32 @@ export default function Calendar() {
                       
                       {daySessions.length > 0 && (
                         <div className="mt-1 space-y-1">
-                          {daySessions.slice(0, 2).map((session) => (
-                            <div
-                              key={session.id}
-                              className={`text-xs px-1 py-0.5 rounded truncate ${
-                                session.payment_status === 'paid' 
-                                  ? 'bg-green-100 text-green-800'
-                                  : session.payment_status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
-                              {format(parseUTC(session.session_date), 'HH:mm')}
-                            </div>
-                          ))}
+                          {daySessions.slice(0, 2).map((session) => {
+                            const patientColor = getSessionColor(session)
+                            const chipStyle = patientColor
+                              ? { backgroundColor: patientColor, color: getReadableTextColor(patientColor) }
+                              : undefined
+                            const chipClassName = patientColor
+                              ? 'text-xs px-1 py-0.5 rounded truncate'
+                              : `text-xs px-1 py-0.5 rounded truncate ${
+                                  session.payment_status === 'paid' 
+                                    ? 'bg-green-100 text-green-800'
+                                    : session.payment_status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`
+
+                            return (
+                              <div
+                                key={session.id}
+                                className={chipClassName}
+                                style={chipStyle}
+                              >
+                                {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
+                                {format(parseUTC(session.session_date), 'HH:mm')}
+                              </div>
+                            )
+                          })}
                           {daySessions.length > 2 && (
                             <div className="text-xs text-gray-500">
                               +{daySessions.length - 2} mais
@@ -505,11 +550,23 @@ export default function Calendar() {
                   <div className="space-y-4">
                     {selectedDateSessions.map(session => {
                       const sessionLink = normalizeSessionLink(session.patients?.session_link)
+                      const patientColor = getSessionColor(session)
                       return (
-                      <div key={session.id} className="border border-gray-200 rounded-lg p-4">
+                      <div
+                        key={session.id}
+                        className={`border border-gray-200 rounded-lg p-4 ${patientColor ? 'border-l-4' : ''}`}
+                        style={patientColor ? { borderLeftColor: patientColor } : undefined}
+                      >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
+                            {patientColor ? (
+                              <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: patientColor }}
+                              />
+                            ) : (
+                              <User className="h-4 w-4 text-gray-400" />
+                            )}
                             <span className="font-medium text-gray-900">
                               {session.patients?.full_name}
                             </span>
