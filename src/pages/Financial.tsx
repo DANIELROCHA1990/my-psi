@@ -5,7 +5,7 @@ import { sessionService } from '../services/sessionService'
 import { FinancialRecord, Patient, Session } from '../types'
 import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, FileText, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, subMonths, subYears } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, subMonths, subYears, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { normalizeSearchText } from '../lib/search'
@@ -18,17 +18,10 @@ export default function Financial() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(null)
-  const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'all'>('month')
+  const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'next_quarter' | 'next_year' | 'all'>('month')
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all')
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'paid' | 'pending' | 'cancelled'>('all')
-  const [stats, setStats] = useState({
-    weeklyRevenue: 0,
-    monthlyRevenue: 0,
-    weeklyExpenses: 0,
-    monthlyExpenses: 0
-  })
-
   useEffect(() => {
     loadData()
   }, [])
@@ -36,42 +29,15 @@ export default function Financial() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [recordsData, patientsData, sessionsData, weeklyRevenue, monthlyRevenue] = await Promise.all([
+      const [recordsData, patientsData, sessionsData] = await Promise.all([
         financialService.getFinancialRecords(),
         patientService.getPatients(),
-        sessionService.getSessions(),
-        financialService.getWeeklyRevenue(),
-        financialService.getMonthlyRevenue()
+        sessionService.getSessions()
       ])
       
       setRecords(recordsData)
       setPatients(patientsData)
       setSessions(sessionsData)
-      
-      // Calculate expenses
-      const weekStart = startOfWeek(new Date())
-      const weekEnd = endOfWeek(new Date())
-      const monthStart = startOfMonth(new Date())
-      const monthEnd = endOfMonth(new Date())
-      
-      const weeklyExpenses = recordsData
-        .filter(r => r.transaction_type === 'expense' && 
-                new Date(r.transaction_date) >= weekStart && 
-                new Date(r.transaction_date) <= weekEnd)
-        .reduce((sum, r) => sum + Number(r.amount), 0)
-      
-      const monthlyExpenses = recordsData
-        .filter(r => r.transaction_type === 'expense' && 
-                new Date(r.transaction_date) >= monthStart && 
-                new Date(r.transaction_date) <= monthEnd)
-        .reduce((sum, r) => sum + Number(r.amount), 0)
-      
-      setStats({
-        weeklyRevenue,
-        monthlyRevenue,
-        weeklyExpenses,
-        monthlyExpenses
-      })
     } catch (error) {
       toast.error('Erro ao carregar dados financeiros')
     } finally {
@@ -124,33 +90,144 @@ export default function Financial() {
     }
   }
 
-  const rangeStart = (() => {
+  const { rangeStart, rangeEnd } = (() => {
     const now = new Date()
     if (dateRange === 'month') {
-      return startOfMonth(now)
+      return { rangeStart: startOfMonth(now), rangeEnd: endOfMonth(now) }
     }
     if (dateRange === 'quarter') {
-      return subMonths(now, 3)
+      return { rangeStart: startOfDay(subMonths(now, 3)), rangeEnd: endOfDay(now) }
     }
     if (dateRange === 'year') {
-      return subYears(now, 1)
+      return { rangeStart: startOfDay(subYears(now, 1)), rangeEnd: endOfDay(now) }
     }
-    return null
+    if (dateRange === 'next_quarter') {
+      return { rangeStart: startOfDay(now), rangeEnd: endOfMonth(addMonths(now, 2)) }
+    }
+    if (dateRange === 'next_year') {
+      return { rangeStart: startOfDay(now), rangeEnd: endOfMonth(addMonths(now, 11)) }
+    }
+    return { rangeStart: null, rangeEnd: null }
   })()
 
+  const dateWithinRange = (date: Date) => {
+    if (rangeStart && date < rangeStart) {
+      return false
+    }
+    if (rangeEnd && date > rangeEnd) {
+      return false
+    }
+    return true
+  }
+
   const recordMatchesRange = (record: FinancialRecord) => {
-    if (!rangeStart) {
+    if (!rangeStart && !rangeEnd) {
       return true
     }
-    return parseISO(record.transaction_date) >= rangeStart
+    const recordDate = parseISO(record.transaction_date)
+    return dateWithinRange(recordDate)
   }
 
   const sessionMatchesRange = (session: Session) => {
-    if (!rangeStart) {
+    if (!rangeStart && !rangeEnd) {
       return true
     }
-    return parseISO(session.session_date) >= rangeStart
+    const sessionDate = parseISO(session.session_date)
+    return dateWithinRange(sessionDate)
   }
+
+  const statsNow = new Date()
+  const weekStart = startOfWeek(statsNow)
+  const weekEnd = endOfWeek(statsNow)
+  const monthStart = startOfMonth(statsNow)
+  const monthEnd = endOfMonth(statsNow)
+
+  const isFutureRange = dateRange === 'next_quarter' || dateRange === 'next_year'
+
+  const statsRecordsBase = records.filter((record) => {
+    if (transactionTypeFilter !== 'all' && record.transaction_type !== transactionTypeFilter) {
+      return false
+    }
+    if (paymentMethodFilter !== 'all' && record.payment_method !== paymentMethodFilter) {
+      return false
+    }
+    return true
+  })
+
+  const statsRecords = isFutureRange
+    ? statsRecordsBase
+    : statsRecordsBase.filter(recordMatchesRange)
+
+  const statsSessionsBase = sessions.filter((session) => session.payment_status === 'paid')
+  const statsSessions = isFutureRange
+    ? statsSessionsBase
+    : statsSessionsBase.filter(sessionMatchesRange)
+
+  const weeklyRevenueSum = statsSessions
+    .filter((record) => {
+      const recordDate = parseISO(record.session_date)
+      return recordDate >= weekStart && recordDate <= weekEnd
+    })
+    .reduce((sum, record) => sum + Number(record.session_price || 0), 0)
+
+  const weeklyRevenueCount = statsSessions
+    .filter((record) => {
+      const recordDate = parseISO(record.session_date)
+      return recordDate >= weekStart && recordDate <= weekEnd
+    }).length
+
+  const revenueEnabled = transactionTypeFilter !== 'expense'
+  const weeklyRevenue = revenueEnabled
+    ? ((dateRange === 'next_quarter' || dateRange === 'next_year')
+        ? (weeklyRevenueCount > 0 ? weeklyRevenueSum / weeklyRevenueCount : 0)
+        : weeklyRevenueSum)
+    : 0
+
+  const monthlyRevenueSum = statsSessions
+    .filter((record) => {
+      const recordDate = parseISO(record.session_date)
+      return recordDate >= monthStart && recordDate <= monthEnd
+    })
+    .reduce((sum, record) => sum + Number(record.session_price || 0), 0)
+  const monthlyRevenue = revenueEnabled ? monthlyRevenueSum : 0
+
+  const weeklyExpensesSum = statsRecords
+    .filter((record) => record.transaction_type === 'expense')
+    .filter((record) => {
+      const recordDate = parseISO(record.transaction_date)
+      if (!isFutureRange && !dateWithinRange(recordDate)) {
+        return false
+      }
+      return recordDate >= weekStart && recordDate <= weekEnd
+    })
+    .reduce((sum, record) => sum + Number(record.amount), 0)
+
+  const weeklyExpensesCount = statsRecords
+    .filter((record) => record.transaction_type === 'expense')
+    .filter((record) => {
+      const recordDate = parseISO(record.transaction_date)
+      if (!isFutureRange && !dateWithinRange(recordDate)) {
+        return false
+      }
+      return recordDate >= weekStart && recordDate <= weekEnd
+    }).length
+
+  const weeklyExpenses = (dateRange === 'next_quarter' || dateRange === 'next_year')
+    ? (weeklyExpensesCount > 0 ? weeklyExpensesSum / weeklyExpensesCount : 0)
+    : weeklyExpensesSum
+
+  const monthlyExpenses = statsRecords
+    .filter((record) => record.transaction_type === 'expense')
+    .filter((record) => {
+      const recordDate = parseISO(record.transaction_date)
+      if (!isFutureRange && !dateWithinRange(recordDate)) {
+        return false
+      }
+      return recordDate >= monthStart && recordDate <= monthEnd
+    })
+    .reduce((sum, record) => sum + Number(record.amount), 0)
+
+  const monthlyBalance = monthlyRevenue - monthlyExpenses
 
   const filteredRecords = records.filter((record) => {
     if (!recordMatchesRange(record)) {
@@ -178,7 +255,7 @@ export default function Financial() {
   const statusChartSessions = sessionsInRange.filter((session) => session.session_price !== null && session.session_price !== undefined)
 
   const pendingReceivable = sessionsInRange
-    .filter((session) => session.payment_status === 'pending')
+    .filter((session) => session.payment_status === 'paid' || session.payment_status === 'pending')
     .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
   const revenueSessions = statusChartSessions.filter((session) => {
@@ -343,7 +420,7 @@ export default function Financial() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Semanal</p>
               <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
-                R$ {stats.weeklyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {weeklyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -357,7 +434,7 @@ export default function Financial() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Mensal</p>
               <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
-                R$ {stats.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -371,7 +448,7 @@ export default function Financial() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Despesas Semanais</p>
               <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
-                R$ {stats.weeklyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {weeklyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -385,9 +462,9 @@ export default function Financial() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Saldo Mensal</p>
               <p className={`text-xl font-bold whitespace-nowrap ${
-                (stats.monthlyRevenue - stats.monthlyExpenses) >= 0 ? 'text-green-600' : 'text-red-600'
+                monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                R$ {(stats.monthlyRevenue - stats.monthlyExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {monthlyBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -433,7 +510,9 @@ export default function Financial() {
               >
                 <option value="month">Mes atual</option>
                 <option value="quarter">Ultimos 3 meses</option>
+                <option value="next_quarter">Proximos 3 meses</option>
                 <option value="year">Ultimos 12 meses</option>
+                <option value="next_year">Proximos 12 meses</option>
                 <option value="all">Todo o periodo</option>
               </select>
             </div>
