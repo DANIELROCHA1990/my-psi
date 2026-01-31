@@ -2,8 +2,9 @@
 import { patientService } from '../services/patientService'
 import { profileService } from '../services/profileService'
 import { sessionService } from '../services/sessionService'
+import { supabase } from '../lib/supabase'
 import { Patient, Profile, SessionSchedule } from '../types'
-import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText } from 'lucide-react'
+import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 import { normalizeSearchText } from '../lib/search'
@@ -18,6 +19,7 @@ export default function Patients() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [reactivateMode, setReactivateMode] = useState(false)
+  const [copyingLinkFor, setCopyingLinkFor] = useState<string | null>(null)
 
   useEffect(() => {
     loadPatients()
@@ -63,6 +65,61 @@ export default function Patients() {
   const handleActivate = (patient: Patient) => {
     setReactivateMode(true)
     setEditingPatient({ ...patient, active: true })
+  }
+
+  const copyTextToClipboard = async (value: string) => {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(value)
+      return
+    }
+
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+
+  const handleCopyPushLink = async (patient: Patient) => {
+    if (copyingLinkFor) return
+    setCopyingLinkFor(patient.id)
+    try {
+      const { data, error } = await supabase.rpc('get_or_create_push_consent_token', {
+        p_patient_id: patient.id
+      })
+
+      if (error) {
+        throw error
+      }
+
+      const token = Array.isArray(data) ? data[0] : data
+      if (!token || typeof token !== 'string') {
+        throw new Error('Token nao retornado.')
+      }
+
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const link = `${origin}/notificacoes?consent=${token}`
+
+      await copyTextToClipboard(link)
+
+      const sentTo = patient.email || patient.phone || null
+      await supabase.rpc('mark_push_consent_token_sent', {
+        p_token: token,
+        p_sent_to: sentTo,
+        p_sent_via: 'copy'
+      })
+
+      toast.success('Link de lembretes copiado')
+    } catch (error) {
+      console.error('Erro ao copiar link de push:', error)
+      toast.error('Falha ao copiar link de lembretes')
+    } finally {
+      setCopyingLinkFor(null)
+    }
   }
 
   const normalizedSearch = normalizeSearchText(searchTerm.trim())
@@ -504,6 +561,15 @@ export default function Patients() {
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                    <button
+                      onClick={() => void handleCopyPushLink(patient)}
+                      className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-60"
+                      title="Copiar link de lembretes"
+                      aria-label="Copiar link de lembretes"
+                      disabled={copyingLinkFor === patient.id}
+                    >
+                      <Link2 className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => { setReactivateMode(false); setEditingPatient(patient) }}
                       className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
