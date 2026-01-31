@@ -419,10 +419,7 @@ export default function Calendar() {
 
     try {
       const { error } = await supabase.functions.invoke('send-agenda-email', {
-        body: { date: agendaEmailDate },
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+        body: { date: agendaEmailDate, accessToken }
       })
 
       if (error) {
@@ -462,10 +459,7 @@ export default function Calendar() {
 
     try {
       const { data, error } = await supabase.functions.invoke('send-agenda-push', {
-        body: { date: agendaPushDate },
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+        body: { date: agendaPushDate, accessToken }
       })
 
       if (error) {

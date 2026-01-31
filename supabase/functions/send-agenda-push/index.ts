@@ -111,7 +111,7 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? ''
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? ''
     const body = await req.json().catch(() => ({}))
     const date = typeof body?.date === 'string' ? body.date.trim() : ''
     const bodyToken = typeof body?.accessToken === 'string' ? body.accessToken.trim() : ''
@@ -147,6 +147,14 @@ serve(async (req) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     })
+
+    const { data: userData, error: userError } = await authClient.auth.getUser()
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     const timezone = Deno.env.get('APP_TIMEZONE') ?? '-03:00'
     const dateRange = getDateRangeIso(date, timezone)

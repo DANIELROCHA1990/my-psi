@@ -252,7 +252,7 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? ''
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? ''
     console.log('send-agenda-email headers keys:', [...req.headers.keys()])
     console.log('send-agenda-email authHeader present?', Boolean(authHeader))
     console.log('send-agenda-email authHeader len:', authHeader.length)
@@ -296,6 +296,13 @@ serve(async (req) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     })
+    const { data: userData, error: userError } = await authClient.auth.getUser()
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
     const decodedPayload = decodeJwtPayload(token)
     const tokenEmail =
       typeof decodedPayload?.email === 'string'
