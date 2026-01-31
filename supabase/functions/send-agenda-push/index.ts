@@ -1,0 +1,360 @@
+/// <reference path="../deno.d.ts" />
+import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
+import { cert, getApps, initializeApp } from 'npm:firebase-admin/app'
+import { getMessaging } from 'npm:firebase-admin/messaging'
+
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined
+  }
+}
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+}
+
+type SessionRow = {
+  patient_id: string
+  session_date: string
+  payment_status: string | null
+  patients?: { full_name: string | null }
+}
+
+type PushSubscriptionRow = {
+  token: string
+  patient_id: string
+}
+
+const getOffsetMinutes = (value?: string | null) => {
+  const fallback = -180
+  if (!value) {
+    return fallback
+  }
+  const trimmed = value.trim()
+  const match = trimmed.match(/^([+-])(\d{2}):?(\d{2})$/)
+  if (!match) {
+    return fallback
+  }
+  const sign = match[1] === '-' ? -1 : 1
+  const hours = Number(match[2])
+  const minutes = Number(match[3])
+  return sign * (hours * 60 + minutes)
+}
+
+const getDateRangeIso = (dateString: string, offsetValue?: string | null) => {
+  const offset = offsetValue || '-03:00'
+  const start = new Date(`${dateString}T00:00:00${offset}`)
+  if (Number.isNaN(start.getTime())) {
+    return null
+  }
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return { startIso: start.toISOString(), endIso: end.toISOString() }
+}
+
+const formatTimeWithOffset = (isoString: string, offsetMinutes: number) => {
+  const base = new Date(isoString)
+  const adjusted = new Date(base.getTime() + offsetMinutes * 60 * 1000)
+  return adjusted.toISOString().slice(11, 16)
+}
+
+const buildBody = (times: string[]) => {
+  const cleaned = Array.from(new Set(times.filter(Boolean))).sort()
+  if (!cleaned.length) {
+    return 'Sua consulta hoje tem horario a confirmar.'
+  }
+  if (cleaned.length === 1) {
+    return `Sua consulta hoje e as ${cleaned[0]}.`
+  }
+  const last = cleaned[cleaned.length - 1]
+  const initial = cleaned.slice(0, -1)
+  return `Suas consultas hoje sao as ${initial.join(', ')} e ${last}.`
+}
+
+const initializeFirebase = () => {
+  const projectId = Deno.env.get('FIREBASE_PROJECT_ID') ?? ''
+  const clientEmail = Deno.env.get('FIREBASE_CLIENT_EMAIL') ?? ''
+  const privateKey = (Deno.env.get('FIREBASE_PRIVATE_KEY') ?? '').replace(/\\n/g, '\n')
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Firebase Admin credentials not configured')
+  }
+
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+      projectId
+    })
+  }
+}
+
+const isInvalidToken = (code?: string) => {
+  if (!code) return false
+  return (
+    code.includes('registration-token-not-registered') ||
+    code.includes('invalid-registration-token')
+  )
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const body = await req.json().catch(() => ({}))
+    const date = typeof body?.date === 'string' ? body.date.trim() : ''
+    const bodyToken = typeof body?.accessToken === 'string' ? body.accessToken.trim() : ''
+    const token = authHeader
+      ? authHeader.replace(/^Bearer\s+/i, '').trim()
+      : bodyToken
+    const dryRun = Boolean(body?.dryRun)
+
+    if (!token) {
+      return new Response(JSON.stringify({ ok: false, error: 'Missing auth token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return new Response(JSON.stringify({ ok: false, error: 'Invalid date' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const supabaseUrl = Deno.env.get('VITE_SUPABASE_URL') ?? ''
+    const anonKey = Deno.env.get('VITE_SUPABASE_ANON_KEY') ?? ''
+
+    if (!supabaseUrl || !anonKey) {
+      return new Response(JSON.stringify({ ok: false, error: 'Supabase anon secrets not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    })
+
+    const timezone = Deno.env.get('APP_TIMEZONE') ?? '-03:00'
+    const dateRange = getDateRangeIso(date, timezone)
+    if (!dateRange) {
+      return new Response(JSON.stringify({ ok: false, error: 'Invalid date range' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const { startIso, endIso } = dateRange
+
+    const { data: sessions, error: sessionsError } = await authClient
+      .from('sessions')
+      .select(
+        `
+        patient_id,
+        session_date,
+        payment_status,
+        patients (
+          full_name
+        )
+      `
+      )
+      .gte('session_date', startIso)
+      .lt('session_date', endIso)
+      .neq('payment_status', 'cancelled')
+      .order('session_date', { ascending: true })
+
+    if (sessionsError) {
+      console.error('Erro ao buscar sessoes:', sessionsError)
+      return new Response(JSON.stringify({ ok: false, error: 'Failed to fetch sessions' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const offsetMinutes = getOffsetMinutes(timezone)
+    const sessionsByPatient = new Map<string, string[]>()
+
+    ;(sessions as SessionRow[] | null)?.forEach((session) => {
+      if (!session.patient_id) return
+      const timeLabel = formatTimeWithOffset(session.session_date, offsetMinutes)
+      const list = sessionsByPatient.get(session.patient_id) ?? []
+      list.push(timeLabel)
+      sessionsByPatient.set(session.patient_id, list)
+    })
+
+    const patientIds = Array.from(sessionsByPatient.keys())
+    if (!patientIds.length) {
+      return new Response(
+        JSON.stringify({ ok: true, patients: 0, tokens: 0, sent: 0, failed: 0, disabled: 0, dryRun }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { data: subscriptions, error: subscriptionsError } = await authClient
+      .from('push_subscriptions')
+      .select('token, patient_id')
+      .eq('is_enabled', true)
+      .in('patient_id', patientIds)
+
+    if (subscriptionsError) {
+      console.error('Erro ao buscar push_subscriptions:', subscriptionsError)
+      return new Response(JSON.stringify({ ok: false, error: 'Failed to fetch subscriptions' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const tokensByPatient = new Map<string, string[]>()
+    ;(subscriptions as PushSubscriptionRow[] | null)?.forEach((sub) => {
+      const list = tokensByPatient.get(sub.patient_id) ?? []
+      list.push(sub.token)
+      tokensByPatient.set(sub.patient_id, list)
+    })
+
+    const patientsWithTokens = patientIds.filter((id) => (tokensByPatient.get(id) ?? []).length > 0)
+    const totalTokens = patientsWithTokens.reduce(
+      (sum, id) => sum + (tokensByPatient.get(id)?.length ?? 0),
+      0
+    )
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          patients: patientsWithTokens.length,
+          tokens: totalTokens,
+          sent: 0,
+          failed: 0,
+          disabled: 0,
+          dryRun
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    initializeFirebase()
+    const messaging = getMessaging()
+
+    let sent = 0
+    let failed = 0
+    let disabled = 0
+    const logRows: Array<Record<string, unknown>> = []
+    const invalidTokens: string[] = []
+
+    for (const patientId of patientsWithTokens) {
+      const tokens = tokensByPatient.get(patientId) ?? []
+      const times = sessionsByPatient.get(patientId) ?? []
+      const bodyMessage = buildBody(times)
+
+      const dataPayload = {
+        route: '/minha-consulta',
+        date,
+        times: Array.from(new Set(times)).join(', '),
+        patient_id: patientId
+      }
+
+      const message = {
+        tokens,
+        notification: {
+          title: 'Lembrete de consulta',
+          body: bodyMessage
+        },
+        data: Object.fromEntries(
+          Object.entries(dataPayload).map(([key, value]) => [key, String(value ?? '')])
+        )
+      }
+
+      const response = await messaging.sendEachForMulticast(message)
+
+      response.responses.forEach((entry, index) => {
+        const token = tokens[index]
+        if (entry.success) {
+          sent += 1
+          logRows.push({
+            date,
+            patient_id: patientId,
+            token,
+            status: 'sent',
+            error: null,
+            payload: { notification: message.notification, data: message.data }
+          })
+          return
+        }
+
+        failed += 1
+        const errorMessage = entry.error?.message || 'Erro desconhecido'
+        const errorCode = entry.error?.code
+        if (isInvalidToken(errorCode)) {
+          invalidTokens.push(token)
+        }
+        logRows.push({
+          date,
+          patient_id: patientId,
+          token,
+          status: 'failed',
+          error: errorMessage,
+          payload: { notification: message.notification, data: message.data }
+        })
+      })
+    }
+
+    if (invalidTokens.length) {
+      const { data: disabledRows, error: disableError } = await authClient
+        .from('push_subscriptions')
+        .update({
+          is_enabled: false,
+          meta: {
+            disabled_reason: 'invalid_token',
+            updated_at: new Date().toISOString()
+          }
+        })
+        .in('token', invalidTokens)
+        .select('token')
+
+      if (disableError) {
+        console.error('Erro ao desativar tokens:', disableError)
+      } else {
+        disabled = disabledRows?.length ?? invalidTokens.length
+      }
+    }
+
+    if (logRows.length) {
+      const { error: logError } = await authClient.from('push_notifications_log').insert(logRows)
+      if (logError) {
+        console.error('Erro ao salvar logs de push:', logError)
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        patients: patientsWithTokens.length,
+        tokens: totalTokens,
+        sent,
+        failed,
+        disabled,
+        dryRun
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Erro ao enviar push:', error)
+    return new Response(JSON.stringify({ ok: false, error: 'Failed to send push' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+})

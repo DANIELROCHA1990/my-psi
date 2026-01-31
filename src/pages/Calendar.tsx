@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { sessionService } from '../services/sessionService'
+import { supabase } from '../lib/supabase'
 import { Session } from '../types'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Edit, ExternalLink } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
@@ -21,6 +22,15 @@ function parseUTC(dateString: string): Date {
   // parseISO() com 'Z' já interpreta como UTC.
   // Não precisamos mais remover ou adicionar 'Z' aqui, apenas parsear.
   return parseISO(dateString);
+}
+
+type AgendaPushResult = {
+  patients: number
+  tokens: number
+  sent: number
+  failed: number
+  disabled: number
+  dryRun?: boolean
 }
 
 function formatSessionTypeLabel(value?: string): string {
@@ -328,6 +338,13 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null) // selectedDate é um objeto Date local
   const [selectedDateSessions, setSelectedDateSessions] = useState<Session[]>([])
   const [editingSession, setEditingSession] = useState<Session | null>(null)
+  const [showAgendaEmailModal, setShowAgendaEmailModal] = useState(false)
+  const [agendaEmailDate, setAgendaEmailDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [sendingAgendaEmail, setSendingAgendaEmail] = useState(false)
+  const [showAgendaPushModal, setShowAgendaPushModal] = useState(false)
+  const [agendaPushDate, setAgendaPushDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [sendingAgendaPush, setSendingAgendaPush] = useState(false)
+  const [agendaPushResult, setAgendaPushResult] = useState<AgendaPushResult | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -352,6 +369,139 @@ export default function Calendar() {
       return null
     }
     return normalized
+  }
+
+  const openAgendaEmailModal = () => {
+    const baseDate = selectedDate || new Date()
+    setAgendaEmailDate(format(baseDate, 'yyyy-MM-dd'))
+    setShowAgendaEmailModal(true)
+  }
+
+  const openAgendaPushModal = () => {
+    const baseDate = selectedDate || new Date()
+    setAgendaPushDate(format(baseDate, 'yyyy-MM-dd'))
+    setAgendaPushResult(null)
+    setShowAgendaPushModal(true)
+  }
+
+  const handleSendAgendaEmail = async () => {
+    if (!agendaEmailDate) {
+      toast.error('Selecione uma data')
+      return
+    }
+
+    const selectedAgendaDate = parseISO(agendaEmailDate)
+    if (Number.isNaN(selectedAgendaDate.getTime())) {
+      toast.error('Data invalida')
+      return
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    let session = sessionData.session
+    if (!session?.access_token) {
+      await supabase.auth.refreshSession()
+      const { data: refreshedData } = await supabase.auth.getSession()
+      session = refreshedData.session
+    }
+    const accessToken = session?.access_token
+    if (!accessToken) {
+      toast.error('Sessao expirada. Faça login novamente.')
+      return
+    }
+    console.log('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL)
+    console.log('token prefix', accessToken.slice(0, 12))
+
+    setSendingAgendaEmail(true)
+
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agenda-email`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ date: agendaEmailDate, accessToken })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`send-agenda-email HTTP ${response.status}: ${errorText}`)
+      }
+
+      toast.success('Agenda enviada para seu e-mail')
+      setShowAgendaEmailModal(false)
+    } catch (error) {
+      console.error('Erro ao enviar agenda:', error)
+      toast.error('Falha ao enviar agenda')
+    } finally {
+      setSendingAgendaEmail(false)
+    }
+  }
+
+  const handleSendAgendaPush = async () => {
+    if (!agendaPushDate) {
+      toast.error('Selecione uma data')
+      return
+    }
+
+    const selectedAgendaDate = parseISO(agendaPushDate)
+    if (Number.isNaN(selectedAgendaDate.getTime())) {
+      toast.error('Data invalida')
+      return
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    let session = sessionData.session
+    if (!session?.access_token) {
+      await supabase.auth.refreshSession()
+      const { data: refreshedData } = await supabase.auth.getSession()
+      session = refreshedData.session
+    }
+    const accessToken = session?.access_token
+    if (!accessToken) {
+      toast.error('Sessao expirada. Faça login novamente.')
+      return
+    }
+
+    setSendingAgendaPush(true)
+    setAgendaPushResult(null)
+
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agenda-push`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ date: agendaPushDate, accessToken })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`send-agenda-push HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = (await response.json()) as { ok: boolean } & Partial<AgendaPushResult>
+      if (result?.ok) {
+        setAgendaPushResult({
+          patients: result.patients ?? 0,
+          tokens: result.tokens ?? 0,
+          sent: result.sent ?? 0,
+          failed: result.failed ?? 0,
+          disabled: result.disabled ?? 0
+        })
+        toast.success('Notificacoes preparadas')
+      } else {
+        toast.error('Falha ao preparar notificacoes')
+      }
+    } catch (error) {
+      console.error('Erro ao enviar push:', error)
+      toast.error('Falha ao preparar notificacoes')
+    } finally {
+      setSendingAgendaPush(false)
+    }
   }
 
   const monthStart = startOfMonth(currentDate) // currentDate e um objeto Date local
@@ -422,9 +572,27 @@ export default function Calendar() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
-        <p className="text-gray-600 mt-2">Visualize e gerencie seus agendamentos.</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
+          <p className="text-gray-600 mt-2">Visualize e gerencie seus agendamentos.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={openAgendaPushModal}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+          >
+            PREPARAR AGENDA
+          </button>
+          <button
+            type="button"
+            onClick={openAgendaEmailModal}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition-colors"
+          >
+            RECEBER AGENDA
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -654,6 +822,111 @@ export default function Calendar() {
             setEditingSession(null)
           }}
         />
+      )}
+
+      {showAgendaPushModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Preparar agenda (Push)</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Envie notificacoes para pacientes com consultas na data escolhida.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data
+                </label>
+                <input
+                  type="date"
+                  value={agendaPushDate}
+                  onChange={(event) => setAgendaPushDate(event.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {agendaPushDate && (
+                <div className="text-sm text-gray-600">
+                  {getSessionsForDate(parseISO(agendaPushDate)).length} sessoes encontradas para esta data.
+                </div>
+              )}
+              {agendaPushResult && (
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700 space-y-1">
+                  <div>{agendaPushResult.patients} pacientes com consulta.</div>
+                  <div>{agendaPushResult.tokens} tokens ativos.</div>
+                  <div>{agendaPushResult.sent} envios OK.</div>
+                  <div>{agendaPushResult.failed} falhas.</div>
+                  <div>{agendaPushResult.disabled} tokens desativados.</div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowAgendaPushModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                onClick={handleSendAgendaPush}
+                disabled={sendingAgendaPush}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {sendingAgendaPush ? 'Preparando...' : 'Preparar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAgendaEmailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Receber agenda por e-mail</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Escolha a data para receber todas as sessões por e-mail.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data
+                </label>
+                <input
+                  type="date"
+                  value={agendaEmailDate}
+                  onChange={(event) => setAgendaEmailDate(event.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              {agendaEmailDate && (
+                <div className="text-sm text-gray-600">
+                  {getSessionsForDate(parseISO(agendaEmailDate)).length} sessões encontradas para esta data.
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowAgendaEmailModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSendAgendaEmail}
+                disabled={sendingAgendaEmail}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {sendingAgendaEmail ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
