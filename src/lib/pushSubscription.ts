@@ -64,6 +64,33 @@ const getMessagingInstance = async () => {
   return getMessaging(app)
 }
 
+const toErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  if (typeof error === 'string') {
+    return error
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message)
+  }
+  return 'Falha ao concluir a operacao.'
+}
+
+export const getPushErrorMessage = (error: unknown) => {
+  const message = toErrorMessage(error)
+  if (message.toLowerCase().includes('invalid consent token')) {
+    return 'Link de consentimento invalido ou expirado.'
+  }
+  if (message.toLowerCase().includes('token already linked')) {
+    return 'Este dispositivo ja foi vinculado a outro paciente.'
+  }
+  if (message.toLowerCase().includes('vapid')) {
+    return 'VAPID key nao configurada para este portal.'
+  }
+  return message
+}
+
 export const getPushSupportStatus = async (): Promise<PushSupportStatus> => {
   if (typeof window === 'undefined') {
     return { supported: false, reason: 'Ambiente nao suporta notificacoes.' }
@@ -112,10 +139,15 @@ export const registerPushToken = async (consentToken: string, meta?: Record<stri
   }
 
   const registration = await ensureServiceWorker()
-  const token = await getToken(messaging, {
-    vapidKey,
-    serviceWorkerRegistration: registration
-  })
+  let token: string
+  try {
+    token = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration
+    })
+  } catch (error) {
+    throw new Error(`Erro ao obter token FCM: ${toErrorMessage(error)}`)
+  }
 
   if (!token) {
     throw new Error('Falha ao obter token de notificacao.')
@@ -130,7 +162,7 @@ export const registerPushToken = async (consentToken: string, meta?: Record<stri
   })
 
   if (error) {
-    throw error
+    throw new Error(`Falha ao salvar assinatura: ${toErrorMessage(error)}`)
   }
 
   setStoredPushToken(token)

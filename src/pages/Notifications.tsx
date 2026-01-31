@@ -5,6 +5,7 @@ import {
   disablePushToken,
   getPushSubscriptionStatus,
   getPushSupportStatus,
+  getPushErrorMessage,
   listenForForegroundMessages,
   registerPushToken
 } from '../lib/pushSubscription'
@@ -139,7 +140,9 @@ export default function Notifications() {
       toast.success('Lembretes ativados')
     } catch (error) {
       console.error('Erro ao ativar push:', error)
-      toast.error('Falha ao ativar lembretes')
+      const message = getPushErrorMessage(error)
+      setStatusMessage(message)
+      toast.error(message)
     } finally {
       setWorking(false)
     }
