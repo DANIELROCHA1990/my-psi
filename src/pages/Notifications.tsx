@@ -99,8 +99,8 @@ export default function Notifications() {
     let unsubscribe = () => {}
     if (permission === 'granted') {
       listenForForegroundMessages((payload) => {
-        const title = payload.notification?.title || 'Lembrete de consulta'
-        const body = payload.notification?.body || ''
+        const title = payload.data?.title || payload.notification?.title || 'Lembrete de sessão'
+        const body = payload.data?.body || payload.notification?.body || ''
         toast.success(`${title}${body ? ` - ${body}` : ''}`)
       }).then((unsub) => {
         unsubscribe = unsub

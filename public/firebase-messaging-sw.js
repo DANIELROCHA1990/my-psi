@@ -56,10 +56,11 @@ if (firebaseLoaded && hasConfig && self.firebase && typeof self.firebase.messagi
 
   if (messaging) {
     messaging.onBackgroundMessage((payload) => {
-      const title = payload?.notification?.title || 'Lembrete de consulta'
+      const data = payload?.data || {}
+      const title = data.title || payload?.notification?.title || 'Lembrete de sessão'
       const options = {
-        body: payload?.notification?.body || '',
-        data: payload?.data || {},
+        body: data.body || payload?.notification?.body || '',
+        data,
         icon: '/favicon.ico',
         badge: '/favicon.ico'
       }

@@ -1,4 +1,4 @@
-/// <reference path="../deno.d.ts" />
+﻿/// <reference path="../deno.d.ts" />
 import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import { cert, getApps, initializeApp } from 'npm:firebase-admin/app'
@@ -20,6 +20,9 @@ type SessionRow = {
   patient_id: string
   session_date: string
   payment_status: string | null
+  session_type?: string | null
+  duration_minutes?: number | null
+  session_price?: number | null
   patients?: { full_name: string | null }
 }
 
@@ -177,6 +180,9 @@ serve(async (req) => {
         patient_id,
         session_date,
         payment_status,
+        session_type,
+        duration_minutes,
+        session_price,
         patients (
           full_name
         )
@@ -197,6 +203,7 @@ serve(async (req) => {
 
     const offsetMinutes = getOffsetMinutes(timezone)
     const sessionsByPatient = new Map<string, string[]>()
+    const sessionDetailsByPatient = new Map<string, SessionRow[]>()
     const patientNames = new Map<string, string>()
 
     ;(sessions as SessionRow[] | null)?.forEach((session) => {
@@ -205,6 +212,9 @@ serve(async (req) => {
       const list = sessionsByPatient.get(session.patient_id) ?? []
       list.push(timeLabel)
       sessionsByPatient.set(session.patient_id, list)
+      const detailList = sessionDetailsByPatient.get(session.patient_id) ?? []
+      detailList.push(session)
+      sessionDetailsByPatient.set(session.patient_id, detailList)
       if (!patientNames.has(session.patient_id)) {
         const name = session.patients?.full_name?.trim() || 'Paciente'
         patientNames.set(session.patient_id, name)
@@ -318,20 +328,49 @@ serve(async (req) => {
       const tokens = [tokenEntry.token]
       const times = sessionsByPatient.get(patientId) ?? []
       const bodyMessage = buildBody(times)
+      const sessionDetails = sessionDetailsByPatient.get(patientId) ?? []
+      const sortedSessions = [...sessionDetails].sort((a, b) => {
+        return new Date(a.session_date).getTime() - new Date(b.session_date).getTime()
+      })
+      const primarySession = sortedSessions[0]
+      const primaryTime = primarySession
+        ? formatTimeWithOffset(primarySession.session_date, offsetMinutes)
+        : times[0] ?? ''
+      const status = primarySession?.payment_status || 'pending'
+      const sessionType = primarySession?.session_type || ''
+      const durationMinutes = primarySession?.duration_minutes ?? 50
+      const priceValue =
+        primarySession?.session_price !== null && primarySession?.session_price !== undefined
+          ? String(primarySession.session_price)
+          : ''
+      const patientName = patientNames.get(patientId) || 'Paciente'
+
+      const route = new URL(`/push/agenda`, 'https://example.org')
+      route.searchParams.set('date', date)
+      if (primaryTime) route.searchParams.set('time', primaryTime)
+      if (durationMinutes) route.searchParams.set('duration', String(durationMinutes))
+      if (status) route.searchParams.set('status', status)
+      if (sessionType) route.searchParams.set('type', sessionType)
+      if (priceValue) route.searchParams.set('price', priceValue)
+      if (patientName) route.searchParams.set('patient', patientName)
 
       const dataPayload = {
-        route: `/calendar?date=${date}`,
+        route: route.pathname + route.search,
+        title: 'Lembrete de sessão',
+        body: bodyMessage,
         date,
+        time: primaryTime,
         times: Array.from(new Set(times)).join(', '),
-        patient_id: patientId
+        patient_id: patientId,
+        patient_name: patientName,
+        status,
+        session_type: sessionType,
+        duration_minutes: String(durationMinutes),
+        session_price: priceValue
       }
 
       const message = {
         tokens,
-        notification: {
-          title: 'Lembrete de sessão',
-          body: bodyMessage
-        },
         data: Object.fromEntries(
           Object.entries(dataPayload).map(([key, value]) => [key, String(value ?? '')])
         )
@@ -349,7 +388,7 @@ serve(async (req) => {
             token,
             status: 'sent',
             error: null,
-            payload: { notification: message.notification, data: message.data }
+            payload: { data: message.data }
           })
           return
         }
@@ -366,7 +405,7 @@ serve(async (req) => {
           token,
           status: 'failed',
           error: errorMessage,
-          payload: { notification: message.notification, data: message.data }
+          payload: { data: message.data }
         })
       })
     }
@@ -414,3 +453,5 @@ serve(async (req) => {
     })
   }
 })
+
+
