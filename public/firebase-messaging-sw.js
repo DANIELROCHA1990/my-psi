@@ -1,4 +1,9 @@
 /* eslint-disable no-undef */
+// Ensure Firebase compat bundle can resolve "window" in a Worker context.
+self.window = self
+// eslint-disable-next-line no-var
+var window = self
+
 const loadFirebaseScripts = () => {
   try {
     importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js')
