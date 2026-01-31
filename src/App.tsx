@@ -11,6 +11,7 @@ import Sessions from './pages/Sessions'
 import Calendar from './pages/Calendar'
 import Financial from './pages/Financial'
 import Settings from './pages/Settings'
+import Notifications from './pages/Notifications'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -31,30 +32,34 @@ export default function App() {
     )
   }
 
-  if (!user) {
-    return (
-      <>
-        <AuthForm />
-        <Toaster position="top-right" />
-      </>
-    )
-  }
-
   return (
     <Router>
-      <ProtectedRoute>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/sessions" element={<Sessions />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/financial" element={<Financial />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </ProtectedRoute>
+      <Routes>
+        <Route path="/notificacoes" element={<Notifications />} />
+        <Route path="/push" element={<Navigate to="/notificacoes" replace />} />
+        <Route
+          path="/auth"
+          element={user ? <Navigate to="/" replace /> : <AuthForm />}
+        />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/patients" element={<Patients />} />
+                  <Route path="/sessions" element={<Sessions />} />
+                  <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/financial" element={<Financial />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
       <Toaster position="top-right" />
     </Router>
   )
