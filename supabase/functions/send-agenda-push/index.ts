@@ -26,6 +26,9 @@ type SessionRow = {
 type PushSubscriptionRow = {
   token: string
   patient_id: string
+  last_seen_at?: string | null
+  updated_at?: string | null
+  created_at?: string | null
 }
 
 const getOffsetMinutes = (value?: string | null) => {
@@ -218,7 +221,7 @@ serve(async (req) => {
 
     const { data: subscriptions, error: subscriptionsError } = await authClient
       .from('push_subscriptions')
-      .select('token, patient_id')
+      .select('token, patient_id, last_seen_at, updated_at, created_at')
       .eq('is_enabled', true)
       .in('patient_id', patientIds)
 
@@ -230,14 +233,44 @@ serve(async (req) => {
       })
     }
 
-    const tokensByPatient = new Map<string, string[]>()
+    const tokensByPatient = new Map<
+      string,
+      { token: string; lastSeenAt: string | null; updatedAt: string | null; createdAt: string | null }
+    >()
     ;(subscriptions as PushSubscriptionRow[] | null)?.forEach((sub) => {
-      const list = tokensByPatient.get(sub.patient_id) ?? []
-      list.push(sub.token)
-      tokensByPatient.set(sub.patient_id, list)
+      const current = tokensByPatient.get(sub.patient_id)
+      const candidate = {
+        token: sub.token,
+        lastSeenAt: sub.last_seen_at ?? null,
+        updatedAt: sub.updated_at ?? null,
+        createdAt: sub.created_at ?? null
+      }
+      if (!current) {
+        tokensByPatient.set(sub.patient_id, candidate)
+        return
+      }
+
+      const currentScore = [
+        current.lastSeenAt,
+        current.updatedAt,
+        current.createdAt
+      ].find(Boolean)
+      const candidateScore = [
+        candidate.lastSeenAt,
+        candidate.updatedAt,
+        candidate.createdAt
+      ].find(Boolean)
+
+      if (!currentScore && candidateScore) {
+        tokensByPatient.set(sub.patient_id, candidate)
+        return
+      }
+      if (currentScore && candidateScore && candidateScore > currentScore) {
+        tokensByPatient.set(sub.patient_id, candidate)
+      }
     })
 
-    const patientsWithTokens = patientIds.filter((id) => (tokensByPatient.get(id) ?? []).length > 0)
+    const patientsWithTokens = patientIds.filter((id) => tokensByPatient.has(id))
     const inactivePatients = patientIds
       .filter((id) => !patientsWithTokens.includes(id))
       .map((id) => patientNames.get(id) || 'Paciente')
@@ -278,12 +311,16 @@ serve(async (req) => {
     const invalidTokens: string[] = []
 
     for (const patientId of patientsWithTokens) {
-      const tokens = tokensByPatient.get(patientId) ?? []
+      const tokenEntry = tokensByPatient.get(patientId)
+      if (!tokenEntry) {
+        continue
+      }
+      const tokens = [tokenEntry.token]
       const times = sessionsByPatient.get(patientId) ?? []
       const bodyMessage = buildBody(times)
 
       const dataPayload = {
-        route: '/minha-consulta',
+        route: `/calendar?date=${date}`,
         date,
         times: Array.from(new Set(times)).join(', '),
         patient_id: patientId

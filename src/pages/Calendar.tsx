@@ -1,6 +1,6 @@
 ﻿// Calendar.tsx
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { sessionService } from '../services/sessionService'
 import { supabase } from '../lib/supabase'
 import { Session } from '../types'
@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { findSessionConflict } from '../lib/scheduling'
 import { normalizeSearchText } from '../lib/search'
+import { useSearchParams } from 'react-router-dom'
 
 // Utilitario: Garante que todas as datas sejam interpretadas como UTC.
 // Se a string já tem 'Z', parseISO a trata como UTC.
@@ -331,6 +332,7 @@ function SessionEditModal({
 
 
 export default function Calendar() {
+  const [searchParams] = useSearchParams()
   const [currentDate, setCurrentDate] = useState(new Date()) // currentDate é um objeto Date local
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null) // selectedDate é um objeto Date local
@@ -345,9 +347,33 @@ export default function Calendar() {
   const [agendaPushResult, setAgendaPushResult] = useState<AgendaPushResult | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const deepLinkDate = useMemo(() => {
+    const param = searchParams.get('date')
+    if (!param) {
+      return null
+    }
+    const parsed = parseISO(param)
+    if (Number.isNaN(parsed.getTime())) {
+      return null
+    }
+    return parsed
+  }, [searchParams])
+
+  useEffect(() => {
+    if (deepLinkDate) {
+      setCurrentDate(deepLinkDate)
+      setSelectedDate(deepLinkDate)
+    }
+  }, [deepLinkDate])
+
   useEffect(() => {
     loadData()
   }, [currentDate])
+
+  useEffect(() => {
+    if (!selectedDate) return
+    setSelectedDateSessions(getSessionsForDate(selectedDate))
+  }, [sessions, selectedDate])
 
   const loadData = async () => {
     try {
