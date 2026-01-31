@@ -371,6 +371,19 @@ export default function Calendar() {
     return normalized
   }
 
+  const getFreshAccessToken = async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    let session = sessionData.session
+    const now = Math.floor(Date.now() / 1000)
+
+    if (!session || (session.expires_at && session.expires_at - now < 60)) {
+      const { data: refreshedData } = await supabase.auth.refreshSession()
+      session = refreshedData.session
+    }
+
+    return session?.access_token ?? null
+  }
+
   const openAgendaEmailModal = () => {
     const baseDate = selectedDate || new Date()
     setAgendaEmailDate(format(baseDate, 'yyyy-MM-dd'))
@@ -396,11 +409,20 @@ export default function Calendar() {
       return
     }
 
+    const accessToken = await getFreshAccessToken()
+    if (!accessToken) {
+      toast.error('Sessao expirada. Faça login novamente.')
+      return
+    }
+
     setSendingAgendaEmail(true)
 
     try {
       const { error } = await supabase.functions.invoke('send-agenda-email', {
-        body: { date: agendaEmailDate }
+        body: { date: agendaEmailDate },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
       })
 
       if (error) {
@@ -429,12 +451,21 @@ export default function Calendar() {
       return
     }
 
+    const accessToken = await getFreshAccessToken()
+    if (!accessToken) {
+      toast.error('Sessao expirada. Faça login novamente.')
+      return
+    }
+
     setSendingAgendaPush(true)
     setAgendaPushResult(null)
 
     try {
       const { data, error } = await supabase.functions.invoke('send-agenda-push', {
-        body: { date: agendaPushDate }
+        body: { date: agendaPushDate },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
       })
 
       if (error) {
