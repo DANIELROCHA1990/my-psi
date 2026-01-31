@@ -1,10 +1,25 @@
 /* eslint-disable no-undef */
-try {
-  importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js')
-  importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js')
-} catch (error) {
-  self.console.error('Falha ao carregar Firebase no Service Worker:', error)
+const loadFirebaseScripts = () => {
+  try {
+    importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js')
+    importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js')
+    return true
+  } catch (error) {
+    self.console.error('Falha ao carregar Firebase no Service Worker (CDN):', error)
+  }
+
+  try {
+    importScripts('/firebase-app-compat.js')
+    importScripts('/firebase-messaging-compat.js')
+    return true
+  } catch (error) {
+    self.console.error('Falha ao carregar Firebase no Service Worker (local):', error)
+  }
+
+  return false
 }
+
+const firebaseLoaded = loadFirebaseScripts()
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmc1jr8EYCTwoMzliNJTD3YC89Rm9VpDU",
@@ -17,7 +32,7 @@ const firebaseConfig = {
 
 const hasConfig = Object.values(firebaseConfig).every((value) => Boolean(value) && value !== 'REPLACE_ME')
 
-if (hasConfig && self.firebase && Array.isArray(self.firebase.apps) && !self.firebase.apps.length) {
+if (firebaseLoaded && hasConfig && self.firebase && Array.isArray(self.firebase.apps) && !self.firebase.apps.length) {
   try {
     self.firebase.initializeApp(firebaseConfig)
   } catch (error) {
@@ -25,7 +40,7 @@ if (hasConfig && self.firebase && Array.isArray(self.firebase.apps) && !self.fir
   }
 }
 
-if (hasConfig && self.firebase && typeof self.firebase.messaging === 'function') {
+if (firebaseLoaded && hasConfig && self.firebase && typeof self.firebase.messaging === 'function') {
   let messaging
   try {
     messaging = self.firebase.messaging()
