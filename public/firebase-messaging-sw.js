@@ -56,6 +56,9 @@ if (firebaseLoaded && hasConfig && self.firebase && typeof self.firebase.messagi
 
   if (messaging) {
     messaging.onBackgroundMessage((payload) => {
+      if (payload?.notification?.title || payload?.notification?.body) {
+        return
+      }
       const data = payload?.data || {}
       const title = data.title || payload?.notification?.title || 'Lembrete de sessão'
       const options = {

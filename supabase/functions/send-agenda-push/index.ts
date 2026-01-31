@@ -354,8 +354,9 @@ serve(async (req) => {
       if (priceValue) route.searchParams.set('price', priceValue)
       if (patientName) route.searchParams.set('patient', patientName)
 
+      const routePath = route.pathname + route.search
       const dataPayload = {
-        route: route.pathname + route.search,
+        route: routePath,
         title: 'Lembrete de sessão',
         body: bodyMessage,
         date,
@@ -371,6 +372,15 @@ serve(async (req) => {
 
       const message = {
         tokens,
+        notification: {
+          title: 'Lembrete de sessão',
+          body: bodyMessage
+        },
+        webpush: {
+          fcmOptions: {
+            link: routePath
+          }
+        },
         data: Object.fromEntries(
           Object.entries(dataPayload).map(([key, value]) => [key, String(value ?? '')])
         )
