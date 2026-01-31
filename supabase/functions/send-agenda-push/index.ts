@@ -63,14 +63,14 @@ const formatTimeWithOffset = (isoString: string, offsetMinutes: number) => {
 const buildBody = (times: string[]) => {
   const cleaned = Array.from(new Set(times.filter(Boolean))).sort()
   if (!cleaned.length) {
-    return 'Sua consulta hoje tem horario a confirmar.'
+    return 'Sua sessão hoje tem horário a confirmar.'
   }
   if (cleaned.length === 1) {
-    return `Sua consulta hoje e as ${cleaned[0]}.`
+    return `Sua sessão será hoje às ${cleaned[0]}.`
   }
   const last = cleaned[cleaned.length - 1]
   const initial = cleaned.slice(0, -1)
-  return `Suas consultas hoje sao as ${initial.join(', ')} e ${last}.`
+  return `Suas sessões serão hoje às ${initial.join(', ')} e ${last}.`
 }
 
 const initializeFirebase = () => {
@@ -194,6 +194,7 @@ serve(async (req) => {
 
     const offsetMinutes = getOffsetMinutes(timezone)
     const sessionsByPatient = new Map<string, string[]>()
+    const patientNames = new Map<string, string>()
 
     ;(sessions as SessionRow[] | null)?.forEach((session) => {
       if (!session.patient_id) return
@@ -201,12 +202,16 @@ serve(async (req) => {
       const list = sessionsByPatient.get(session.patient_id) ?? []
       list.push(timeLabel)
       sessionsByPatient.set(session.patient_id, list)
+      if (!patientNames.has(session.patient_id)) {
+        const name = session.patients?.full_name?.trim() || 'Paciente'
+        patientNames.set(session.patient_id, name)
+      }
     })
 
     const patientIds = Array.from(sessionsByPatient.keys())
     if (!patientIds.length) {
       return new Response(
-        JSON.stringify({ ok: true, patients: 0, tokens: 0, sent: 0, failed: 0, disabled: 0, dryRun }),
+        JSON.stringify({ ok: true, patients: 0, sent: 0, inactivePatients: [], dryRun }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -233,20 +238,31 @@ serve(async (req) => {
     })
 
     const patientsWithTokens = patientIds.filter((id) => (tokensByPatient.get(id) ?? []).length > 0)
-    const totalTokens = patientsWithTokens.reduce(
-      (sum, id) => sum + (tokensByPatient.get(id)?.length ?? 0),
-      0
-    )
+    const inactivePatients = patientIds
+      .filter((id) => !patientsWithTokens.includes(id))
+      .map((id) => patientNames.get(id) || 'Paciente')
+      .sort((a, b) => a.localeCompare(b))
+
+    if (!patientsWithTokens.length) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          patients: patientIds.length,
+          sent: 0,
+          inactivePatients,
+          dryRun
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (dryRun) {
       return new Response(
         JSON.stringify({
           ok: true,
-          patients: patientsWithTokens.length,
-          tokens: totalTokens,
+          patients: patientIds.length,
           sent: 0,
-          failed: 0,
-          disabled: 0,
+          inactivePatients,
           dryRun
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -258,7 +274,6 @@ serve(async (req) => {
 
     let sent = 0
     let failed = 0
-    let disabled = 0
     const logRows: Array<Record<string, unknown>> = []
     const invalidTokens: string[] = []
 
@@ -277,7 +292,7 @@ serve(async (req) => {
       const message = {
         tokens,
         notification: {
-          title: 'Lembrete de consulta',
+          title: 'Lembrete de sessão',
           body: bodyMessage
         },
         data: Object.fromEntries(
@@ -334,8 +349,6 @@ serve(async (req) => {
 
       if (disableError) {
         console.error('Erro ao desativar tokens:', disableError)
-      } else {
-        disabled = disabledRows?.length ?? invalidTokens.length
       }
     }
 
@@ -349,11 +362,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
-        patients: patientsWithTokens.length,
-        tokens: totalTokens,
+        patients: patientIds.length,
         sent,
-        failed,
-        disabled,
+        inactivePatients,
         dryRun
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

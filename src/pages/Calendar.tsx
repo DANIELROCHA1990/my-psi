@@ -26,10 +26,8 @@ function parseUTC(dateString: string): Date {
 
 type AgendaPushResult = {
   patients: number
-  tokens: number
   sent: number
-  failed: number
-  disabled: number
+  inactivePatients?: string[]
   dryRun?: boolean
 }
 
@@ -470,10 +468,8 @@ export default function Calendar() {
       if (result?.ok) {
         setAgendaPushResult({
           patients: result.patients ?? 0,
-          tokens: result.tokens ?? 0,
           sent: result.sent ?? 0,
-          failed: result.failed ?? 0,
-          disabled: result.disabled ?? 0
+          inactivePatients: result.inactivePatients ?? []
         })
         toast.success('Notificacoes preparadas')
       } else {
@@ -836,10 +832,16 @@ export default function Calendar() {
               {agendaPushResult && (
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700 space-y-1">
                   <div>{agendaPushResult.patients} pacientes com consulta.</div>
-                  <div>{agendaPushResult.tokens} tokens ativos.</div>
                   <div>{agendaPushResult.sent} envios OK.</div>
-                  <div>{agendaPushResult.failed} falhas.</div>
-                  <div>{agendaPushResult.disabled} tokens desativados.</div>
+                  {agendaPushResult.inactivePatients?.length ? (
+                    <div className="pt-2 space-y-1 text-emerald-800">
+                      {agendaPushResult.inactivePatients.map((name, index) => (
+                        <div key={`${name}-${index}`}>
+                          o paciente {name} nao esta com as notificacoes ativas
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
