@@ -473,7 +473,8 @@ export default function Calendar() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`
         },
         body: JSON.stringify({ date: agendaPushDate, accessToken })
       })
