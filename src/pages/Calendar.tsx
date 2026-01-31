@@ -396,37 +396,15 @@ export default function Calendar() {
       return
     }
 
-    const { data: sessionData } = await supabase.auth.getSession()
-    let session = sessionData.session
-    if (!session?.access_token) {
-      await supabase.auth.refreshSession()
-      const { data: refreshedData } = await supabase.auth.getSession()
-      session = refreshedData.session
-    }
-    const accessToken = session?.access_token
-    if (!accessToken) {
-      toast.error('Sessao expirada. Faça login novamente.')
-      return
-    }
-    console.log('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL)
-    console.log('token prefix', accessToken.slice(0, 12))
-
     setSendingAgendaEmail(true)
 
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agenda-email`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({ date: agendaEmailDate, accessToken })
+      const { error } = await supabase.functions.invoke('send-agenda-email', {
+        body: { date: agendaEmailDate }
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`send-agenda-email HTTP ${response.status}: ${errorText}`)
+      if (error) {
+        throw error
       }
 
       toast.success('Agenda enviada para seu e-mail')
@@ -451,40 +429,19 @@ export default function Calendar() {
       return
     }
 
-    const { data: sessionData } = await supabase.auth.getSession()
-    let session = sessionData.session
-    if (!session?.access_token) {
-      await supabase.auth.refreshSession()
-      const { data: refreshedData } = await supabase.auth.getSession()
-      session = refreshedData.session
-    }
-    const accessToken = session?.access_token
-    if (!accessToken) {
-      toast.error('Sessao expirada. Faça login novamente.')
-      return
-    }
-
     setSendingAgendaPush(true)
     setAgendaPushResult(null)
 
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agenda-push`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ date: agendaPushDate, accessToken })
+      const { data, error } = await supabase.functions.invoke('send-agenda-push', {
+        body: { date: agendaPushDate }
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`send-agenda-push HTTP ${response.status}: ${errorText}`)
+      if (error) {
+        throw error
       }
 
-      const result = (await response.json()) as { ok: boolean } & Partial<AgendaPushResult>
+      const result = (data ?? {}) as { ok: boolean } & Partial<AgendaPushResult>
       if (result?.ok) {
         setAgendaPushResult({
           patients: result.patients ?? 0,
