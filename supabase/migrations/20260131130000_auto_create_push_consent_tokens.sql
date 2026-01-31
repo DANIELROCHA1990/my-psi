@@ -22,7 +22,7 @@ CREATE TRIGGER trigger_create_push_consent_token
 -- Backfill: create tokens for existing patients without an active token
 INSERT INTO public.push_consent_tokens (patient_id, token, expires_at)
 SELECT p.id,
-       encode(gen_random_bytes(32), 'hex') as token,
+       encode(extensions.gen_random_bytes(32), 'hex') as token,
        NULL as expires_at
 FROM public.patients p
 LEFT JOIN public.push_consent_tokens t
