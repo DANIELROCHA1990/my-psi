@@ -3,7 +3,7 @@
 import { supabase } from '../lib/supabase'
 import { Session, SessionSchedule } from '../types'
 import { addDays, addWeeks, parseISO, format } from 'date-fns'
-import { findSessionConflict } from '../lib/scheduling'
+import { DEFAULT_SESSION_DURATION_MINUTES, findSessionConflict, getFirstAvailableSessionStart } from '../lib/scheduling'
 
 /**
  * ðŸ”§ UtilitÃírio: Converte um objeto Date (que Ã© sempre no fuso horÃírio local do ambiente)
@@ -281,6 +281,7 @@ export const sessionService = {
   async createSession(session: Omit<Session, 'id' | 'created_at' | 'user_id'>): Promise<Session> {
     const sessionData = {
       ...session,
+      duration_minutes: DEFAULT_SESSION_DURATION_MINUTES,
       // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar.
       // Assume que session.session_date pode vir como string (já formatada) ou Date.
       session_date: normalizeSessionDateValue(session.session_date)
@@ -323,6 +324,7 @@ export const sessionService = {
       // Converte a data da sessão para uma string ISO 8601 UTC antes de salvar, se a data for atualizada.
       updateData.session_date = normalizeSessionDateValue(updateData.session_date)
     }
+    updateData.duration_minutes = DEFAULT_SESSION_DURATION_MINUTES
     
     const { data, error } = await supabase
       .from('sessions')
@@ -465,7 +467,7 @@ export const sessionService = {
           // Converte a data e hora final (que estÃí no fuso horÃírio local) para UTC
           // antes de enviar para o banco de dados.
           session_date: toISOStringUTC(sessionDateLocal),
-          duration_minutes: schedule.durationMinutes ?? 50,
+          duration_minutes: DEFAULT_SESSION_DURATION_MINUTES,
           session_type: schedule.sessionType || 'Sessao Individual',
           session_price: schedule.sessionPrice ?? (patient?.session_price || null),
           payment_status: schedule.paymentStatus || 'pending',
@@ -484,16 +486,24 @@ export const sessionService = {
 
     for (const session of sessions) {
       const candidateStart = parseISO(session.session_date)
-      const duration = session.duration_minutes ?? 50
       const conflict = findSessionConflict(
         [...existingSessions, ...plannedSessions],
-        candidateStart,
-        duration
+        candidateStart
       )
 
       if (conflict) {
         const conflictName = conflict.patients?.full_name || 'outro paciente'
-        throw new Error(`Conflito de horario com sessao de ${conflictName}`)
+        const nextAvailableStart = getFirstAvailableSessionStart(
+          [...existingSessions, ...plannedSessions],
+          candidateStart
+        )
+        const conflictError = new Error(`Conflito de horario com sessao de ${conflictName}`)
+        ;(conflictError as any).code = 'SCHEDULE_CONFLICT'
+        ;(conflictError as any).conflict = {
+          patientName: conflictName,
+          nextAvailableStart
+        }
+        throw conflictError
       }
 
       plannedSessions.push({

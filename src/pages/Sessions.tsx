@@ -6,8 +6,9 @@ import { Plus, Search, Edit, Calendar, Clock, DollarSign, FileText, CalendarCloc
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { findSessionConflict } from '../lib/scheduling'
+import { DEFAULT_SESSION_DURATION_MINUTES, findSessionConflict, getFirstAvailableSessionStart } from '../lib/scheduling'
 import { normalizeSearchText } from '../lib/search'
+import ConflictModal from '../components/common/ConflictModal'
 
 type PaymentStatus = 'paid' | 'pending' | 'cancelled'
 
@@ -425,6 +426,10 @@ function MonthSessionsModal({
   const [rescheduleTarget, setRescheduleTarget] = useState<Session | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleLoading, setRescheduleLoading] = useState(false)
+  const [conflictInfo, setConflictInfo] = useState<{
+    patientName: string
+    nextAvailableStart: Date
+  } | null>(null)
 
   const patientGroups = useMemo<PatientMonthGroup[]>(() => {
     const groups = new Map<string, PatientMonthGroup>()
@@ -556,14 +561,19 @@ function MonthSessionsModal({
       return
     }
 
-    const duration = rescheduleTarget.duration_minutes ?? 50
-    const conflict = findSessionConflict(allSessions, candidateStart, duration, {
+    const conflict = findSessionConflict(allSessions, candidateStart, {
       excludeSessionId: rescheduleTarget.id
     })
 
     if (conflict) {
       const conflictName = getPatientName(conflict.patient_id, conflict.patients?.full_name)
-      toast.error(`Conflito com sessao de ${conflictName}`)
+      const nextAvailableStart = getFirstAvailableSessionStart(allSessions, candidateStart, {
+        excludeSessionId: rescheduleTarget.id
+      })
+      setConflictInfo({
+        patientName: conflictName,
+        nextAvailableStart
+      })
       return
     }
 
@@ -753,6 +763,15 @@ function MonthSessionsModal({
           </div>
         </div>
       )}
+
+      <ConflictModal
+        open={Boolean(conflictInfo)}
+        patientName={conflictInfo?.patientName || 'paciente'}
+        firstAvailableTime={
+          conflictInfo ? format(conflictInfo.nextAvailableStart, 'HH:mm') : ''
+        }
+        onClose={() => setConflictInfo(null)}
+      />
     </div>
   )
 }
@@ -778,7 +797,6 @@ function SessionModal({
   const [formData, setFormData] = useState({
     patient_id: session?.patient_id || '',
     session_date: session?.session_date ? format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
-    duration_minutes: session?.duration_minutes?.toString() || '50',
     session_type: session?.session_type || 'Sessao Individual',
     session_notes: session?.session_notes || '',
     mood_before: session?.mood_before || '',
@@ -790,6 +808,10 @@ function SessionModal({
     summary: session?.summary || ''
   })
   const [loading, setLoading] = useState(false)
+  const [conflictInfo, setConflictInfo] = useState<{
+    patientName: string
+    nextAvailableStart: Date
+  } | null>(null)
   
   // Atualizar preco quando paciente for selecionado
   const handlePatientChange = (patientId: string) => {
@@ -816,14 +838,19 @@ function SessionModal({
       return
     }
 
-    const duration = formData.duration_minutes ? Number(formData.duration_minutes) : 50
-    const conflict = findSessionConflict(sessions, candidateStart, duration, {
+    const conflict = findSessionConflict(sessions, candidateStart, {
       excludeSessionId: session?.id
     })
 
     if (conflict) {
       const conflictName = conflict.patients?.full_name || 'paciente'
-      toast.error(`Conflito com sessao de ${conflictName}`)
+      const nextAvailableStart = getFirstAvailableSessionStart(sessions, candidateStart, {
+        excludeSessionId: session?.id
+      })
+      setConflictInfo({
+        patientName: conflictName,
+        nextAvailableStart
+      })
       return
     }
 
@@ -833,7 +860,7 @@ function SessionModal({
       const sessionData = {
         patient_id: formData.patient_id,
         session_date: formData.session_date,
-        duration_minutes: formData.duration_minutes ? Number(formData.duration_minutes) : undefined,
+        duration_minutes: DEFAULT_SESSION_DURATION_MINUTES,
         session_type: formData.session_type || undefined,
         session_notes: formData.session_notes || undefined,
         mood_before: formData.mood_before || undefined,
@@ -913,11 +940,12 @@ function SessionModal({
                 </label>
                 <input
                   type="number"
-                  min="1"
-                  value={formData.duration_minutes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  min={DEFAULT_SESSION_DURATION_MINUTES}
+                  value={DEFAULT_SESSION_DURATION_MINUTES}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
                 />
+                <p className="text-xs text-gray-500 mt-1">Duracao fixa de 50 minutos.</p>
               </div>
               
               <div>
@@ -1072,6 +1100,14 @@ function SessionModal({
           </div>
         </form>
       </div>
+      <ConflictModal
+        open={Boolean(conflictInfo)}
+        patientName={conflictInfo?.patientName || 'paciente'}
+        firstAvailableTime={
+          conflictInfo ? format(conflictInfo.nextAvailableStart, 'HH:mm') : ''
+        }
+        onClose={() => setConflictInfo(null)}
+      />
     </div>
   )
 }

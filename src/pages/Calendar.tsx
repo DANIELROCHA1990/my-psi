@@ -8,9 +8,10 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Edit,
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
-import { findSessionConflict } from '../lib/scheduling'
+import { DEFAULT_SESSION_DURATION_MINUTES, findSessionConflict, getFirstAvailableSessionStart } from '../lib/scheduling'
 import { normalizeSearchText } from '../lib/search'
 import { useSearchParams } from 'react-router-dom'
+import ConflictModal from '../components/common/ConflictModal'
 
 // Utilitario: Garante que todas as datas sejam interpretadas como UTC.
 // Se a string já tem 'Z', parseISO a trata como UTC.
@@ -115,13 +116,16 @@ function SessionEditModal({
   const initialSessionDate = format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm")
   const [formData, setFormData] = useState({
     session_date: initialSessionDate,
-    duration_minutes: session.duration_minutes?.toString() || '50',
     session_type: session.session_type || 'Sessao Individual',
     session_price: session.session_price?.toString() || '',
     payment_status: session.payment_status || 'pending',
     summary: session.summary || ''
   })
   const [saving, setSaving] = useState(false)
+  const [conflictInfo, setConflictInfo] = useState<{
+    patientName: string
+    nextAvailableStart: Date
+  } | null>(null)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -137,14 +141,19 @@ function SessionEditModal({
       return
     }
 
-    const duration = formData.duration_minutes ? Number(formData.duration_minutes) : 50
-    const conflict = findSessionConflict(allSessions, candidateStart, duration, {
+    const conflict = findSessionConflict(allSessions, candidateStart, {
       excludeSessionId: session.id
     })
 
     if (conflict) {
       const conflictName = conflict.patients?.full_name || 'paciente'
-      toast.error(`Conflito com sessao de ${conflictName}`)
+      const nextAvailableStart = getFirstAvailableSessionStart(allSessions, candidateStart, {
+        excludeSessionId: session.id
+      })
+      setConflictInfo({
+        patientName: conflictName,
+        nextAvailableStart
+      })
       return
     }
 
@@ -158,7 +167,7 @@ function SessionEditModal({
       }
 
       const updates: Partial<Session> = {
-        duration_minutes: formData.duration_minutes ? Number(formData.duration_minutes) : undefined,
+        duration_minutes: DEFAULT_SESSION_DURATION_MINUTES,
         session_type: formData.session_type || undefined,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         payment_status: formData.payment_status || 'pending',
@@ -203,8 +212,9 @@ function SessionEditModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Editar sessao</h2>
           <p className="text-sm text-gray-600 mt-1">{session.patients?.full_name}</p>
@@ -231,11 +241,12 @@ function SessionEditModal({
               </label>
               <input
                 type="number"
-                min="1"
-                value={formData.duration_minutes}
-                onChange={(event) => setFormData(prev => ({ ...prev, duration_minutes: event.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                min={DEFAULT_SESSION_DURATION_MINUTES}
+                value={DEFAULT_SESSION_DURATION_MINUTES}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
               />
+              <p className="text-xs text-gray-500 mt-1">Duracao fixa de 50 minutos.</p>
             </div>
 
             <div>
@@ -325,8 +336,17 @@ function SessionEditModal({
             </div>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+      <ConflictModal
+        open={Boolean(conflictInfo)}
+        patientName={conflictInfo?.patientName || 'paciente'}
+        firstAvailableTime={
+          conflictInfo ? format(conflictInfo.nextAvailableStart, 'HH:mm') : ''
+        }
+        onClose={() => setConflictInfo(null)}
+      />
+    </>
   )
 }
 

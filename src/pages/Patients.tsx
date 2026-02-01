@@ -3,13 +3,15 @@ import { patientService } from '../services/patientService'
 import { profileService } from '../services/profileService'
 import { sessionService } from '../services/sessionService'
 import { supabase } from '../lib/supabase'
-import { Patient, Profile, SessionSchedule } from '../types'
+import { Patient, Profile, Session, SessionSchedule } from '../types'
 import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format, parseISO } from 'date-fns'
+import { addDays, addWeeks, format, parseISO } from 'date-fns'
 import { normalizeSearchText } from '../lib/search'
 import { ptBR } from 'date-fns/locale'
 import { jsPDF } from 'jspdf'
+import ConflictModal from '../components/common/ConflictModal'
+import { findSessionConflict, getFirstAvailableSessionStart } from '../lib/scheduling'
 
 export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([])
@@ -712,6 +714,11 @@ function PatientModal({
     isNewPatient || forceManageAutoSessions || (patient?.session_schedules?.length ?? 0) > 0
   )
   const [loading, setLoading] = useState(false)
+  const [conflictInfo, setConflictInfo] = useState<{
+    patientName: string
+    nextAvailableStart: Date
+  } | null>(null)
+  const [closeAfterConflict, setCloseAfterConflict] = useState(false)
   const normalizedCalendarColor = normalizeHexColorValue(formData.calendar_color)
   const calendarColorValid = normalizedCalendarColor ? isValidHexColor(normalizedCalendarColor) : true
   
@@ -765,6 +772,129 @@ function PatientModal({
     }))
   }
 
+  const getFrequencyIntervalWeeks = (frequency?: string) => {
+    switch (frequency) {
+      case 'biweekly':
+        return 2
+      case 'monthly':
+        return 4
+      case 'as_needed':
+        return 0
+      default:
+        return 1
+    }
+  }
+
+  const buildPlannedSessionStarts = (weeksToCreate: number) => {
+    const planned: Date[] = []
+    if (!sessionSchedules.length) {
+      return planned
+    }
+
+    const nowLocal = new Date()
+    const intervalWeeks = getFrequencyIntervalWeeks(formData.session_frequency)
+    const occurrences = intervalWeeks === 0
+      ? 1
+      : Math.max(1, Math.ceil(weeksToCreate / intervalWeeks))
+
+    sessionSchedules.forEach((schedule) => {
+      if (!schedule.time) {
+        return
+      }
+      const [hours, minutes] = schedule.time.split(':').map(Number)
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return
+      }
+      const baseDate = new Date(nowLocal)
+      baseDate.setHours(hours, minutes, 0, 0)
+
+      const currentDay = baseDate.getDay()
+      let daysToAdd = schedule.dayOfWeek - currentDay
+      if (daysToAdd < 0) {
+        daysToAdd += 7
+      }
+      if (daysToAdd === 0 && baseDate < nowLocal) {
+        daysToAdd = 7
+      }
+
+      const firstSessionDateLocal = addDays(baseDate, daysToAdd)
+
+      for (let occurrence = 0; occurrence < occurrences; occurrence++) {
+        const sessionDateLocal = intervalWeeks === 0
+          ? firstSessionDateLocal
+          : addWeeks(firstSessionDateLocal, occurrence * intervalWeeks)
+        planned.push(new Date(sessionDateLocal))
+      }
+    })
+
+    return planned
+  }
+
+  const checkScheduleConflicts = async (patientId?: string) => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select(`
+        *,
+        patients (
+          id,
+          full_name
+        )
+      `)
+      .order('session_date', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    const sessions = (data || []) as Session[]
+    const sessionsToCheck = patientId
+      ? sessions.filter((session) => session.patient_id !== patientId)
+      : sessions
+
+    const plannedStarts = buildPlannedSessionStarts(12)
+
+    for (const start of plannedStarts) {
+      const conflict = findSessionConflict(sessionsToCheck, start)
+      if (conflict) {
+        const conflictName = conflict.patients?.full_name || 'paciente'
+        const nextAvailableStart = getFirstAvailableSessionStart(sessionsToCheck, start)
+        setConflictInfo({
+          patientName: conflictName,
+          nextAvailableStart
+        })
+        return true
+      }
+    }
+
+    return false
+  }
+
+  const handleScheduleConflict = (error: unknown, options?: { closeAfter?: boolean }) => {
+    const rawConflict = (error as { conflict?: unknown } | null)?.conflict
+    if (!rawConflict || typeof rawConflict !== 'object') {
+      return false
+    }
+    const conflict = rawConflict as {
+      patientName?: string
+      nextAvailableStart?: Date | string
+    }
+    if (!conflict.patientName || !conflict.nextAvailableStart) {
+      return false
+    }
+    const nextAvailableStart = conflict.nextAvailableStart instanceof Date
+      ? conflict.nextAvailableStart
+      : new Date(conflict.nextAvailableStart)
+    if (Number.isNaN(nextAvailableStart.getTime())) {
+      return false
+    }
+    setCloseAfterConflict(Boolean(options?.closeAfter))
+    setConflictInfo({
+      patientName: conflict.patientName,
+      nextAvailableStart
+    })
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -806,8 +936,24 @@ function PatientModal({
           JSON.stringify(normalizeSchedulesForCompare((patient.session_schedules as SessionSchedule[] | undefined) || []))
         : true
       const deactivatingPatient = Boolean(patient?.active && patientData.active === false)
+      const shouldCheckSchedules = sessionSchedules.length > 0 && !deactivatingPatient
 
       if (patient) {
+        if (shouldCheckSchedules) {
+          try {
+            const hasConflict = await checkScheduleConflicts(patient.id)
+            if (hasConflict) {
+              return
+            }
+          } catch (conflictError) {
+            if (handleScheduleConflict(conflictError)) {
+              return
+            }
+            toast.error('Erro ao validar conflitos de agenda')
+            return
+          }
+        }
+
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
         if (deactivatingPatient) {
@@ -826,12 +972,31 @@ function PatientModal({
             )
             toast.success('Paciente e sessões atualizados com sucesso')
           } catch (sessionError) {
+            if (handleScheduleConflict(sessionError)) {
+              return
+            }
             toast.error('Paciente atualizado, mas erro ao atualizar sessões')
+            return
           }
         } else {
           toast.success('Paciente atualizado com sucesso')
         }
       } else {
+        if (sessionSchedules.length > 0 && patientData.active !== false) {
+          try {
+            const hasConflict = await checkScheduleConflicts()
+            if (hasConflict) {
+              return
+            }
+          } catch (conflictError) {
+            if (handleScheduleConflict(conflictError)) {
+              return
+            }
+            toast.error('Erro ao validar conflitos de agenda')
+            return
+          }
+        }
+
         const { data: newPatient, error } = await patientService.createPatient(patientData as any)
         if (error) throw error
         
@@ -845,7 +1010,11 @@ function PatientModal({
             )
             toast.success('Paciente e sessões criados com sucesso')
           } catch (sessionError) {
+            if (handleScheduleConflict(sessionError, { closeAfter: true })) {
+              return
+            }
             toast.error('Paciente criado, mas erro ao criar sessões')
+            return
           }
         } else {
           toast.success('Paciente criado com sucesso')
@@ -1345,6 +1514,22 @@ function PatientModal({
           </div>
         </form>
       </div>
+      <ConflictModal
+        open={Boolean(conflictInfo)}
+        patientName={conflictInfo?.patientName || 'paciente'}
+        firstAvailableTime={
+          conflictInfo ? format(conflictInfo.nextAvailableStart, 'HH:mm') : ''
+        }
+        onClose={() => {
+          setConflictInfo(null)
+          if (closeAfterConflict) {
+            setCloseAfterConflict(false)
+            onSave()
+            return
+          }
+          setCloseAfterConflict(false)
+        }}
+      />
     </div>
   )
 }
