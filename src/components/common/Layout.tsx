@@ -44,6 +44,7 @@ export default function Layout({ children }: LayoutProps) {
     return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false
   })
   const [profileName, setProfileName] = useState('')
+  const [profileLogo, setProfileLogo] = useState('')
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -59,6 +60,7 @@ export default function Layout({ children }: LayoutProps) {
       }
       const profile = await profileService.getProfile()
       setProfileName(profile?.full_name?.trim() || '')
+      setProfileLogo(profile?.logo_data?.trim() || '')
     }
     loadProfileName()
   }, [user?.id])
@@ -121,9 +123,13 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
             <div className="flex-shrink-0 flex items-center px-4">
               <div className="flex items-center">
-                <div className="bg-emerald-600 p-2 rounded-lg">
-                  <Brain className="h-8 w-8 text-white" />
-                </div>
+                {profileLogo ? (
+                  <img src={profileLogo} alt="Logo" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="bg-emerald-600 p-2 rounded-lg">
+                    <Brain className="h-8 w-8 text-white" />
+                  </div>
+                )}
                 <span className="ml-3 text-xl font-bold text-gray-900">MyPsi</span>
               </div>
             </div>
@@ -189,9 +195,13 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-3 px-3">
-                <div className="bg-emerald-600 p-2 rounded-lg">
-                  <Brain className="h-8 w-8 text-white" />
-                </div>
+                {profileLogo ? (
+                  <img src={profileLogo} alt="Logo" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="bg-emerald-600 p-2 rounded-lg">
+                    <Brain className="h-8 w-8 text-white" />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(false)}
@@ -204,9 +214,13 @@ export default function Layout({ children }: LayoutProps) {
             ) : (
               <div className="flex items-center justify-between flex-shrink-0 px-4">
                 <div className="flex items-center">
+                {profileLogo ? (
+                  <img src={profileLogo} alt="Logo" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
                   <div className="bg-emerald-600 p-2 rounded-lg">
                     <Brain className="h-8 w-8 text-white" />
                   </div>
+                )}
                   <span className="ml-3 text-xl font-bold text-gray-900">MyPsi</span>
                 </div>
                 <button

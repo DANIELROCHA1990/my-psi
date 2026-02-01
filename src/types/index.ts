@@ -12,6 +12,7 @@ export interface Profile {
   specialty?: string
   crp_number?: string
   signature_data?: string | null
+  logo_data?: string | null
   phone?: string
   email?: string
   address?: string

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { profileService } from '../services/profileService'
 import { authService } from '../services/authService'
 import { Profile } from '../types'
 import { User, Lock, Mail, Phone, MapPin, DollarSign, Save, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '../lib/supabase'
 
 export default function Settings() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -20,6 +23,7 @@ export default function Settings() {
     specialty: '',
     crp_number: '',
     signature_data: '',
+    logo_data: '',
     phone: '',
     email: '',
     address: '',
@@ -51,6 +55,7 @@ export default function Settings() {
           specialty: profileData.specialty || '',
           crp_number: profileData.crp_number || '',
           signature_data: profileData.signature_data || '',
+          logo_data: profileData.logo_data || '',
           phone: profileData.phone || '',
           email: user?.email || profileData.email || '',
           address: profileData.address || '',
@@ -93,11 +98,69 @@ export default function Settings() {
     setProfileData(prev => ({ ...prev, signature_data: '' }))
   }
 
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ['image/png', 'image/jpeg']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Envie um arquivo PNG ou JPG.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setProfileData(prev => ({ ...prev, logo_data: reader.result as string }))
+    }
+    reader.onerror = () => {
+      toast.error('Erro ao carregar logo')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleLogoRemove = () => {
+    setProfileData(prev => ({ ...prev, logo_data: '' }))
+  }
+
+  const handleAuthFailure = async (message?: string) => {
+    const normalized = (message || '').toLowerCase()
+    if (!normalized.includes('refresh token') && !normalized.includes('jwt')) {
+      return false
+    }
+    toast.error('Sessao expirada. Faça login novamente.')
+    await authService.signOut()
+    navigate('/auth')
+    return true
+  }
+
+  const ensureValidSession = async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    let session = sessionData.session
+    if (!session) {
+      return false
+    }
+    const now = Math.floor(Date.now() / 1000)
+    if (session.expires_at && session.expires_at - now < 60) {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (error || !data.session) {
+        return false
+      }
+      session = data.session
+    }
+    return Boolean(session)
+  }
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
 
     try {
+      const sessionOk = await ensureValidSession()
+      if (!sessionOk) {
+        await handleAuthFailure('refresh token')
+        return
+      }
+
       const data = {
         ...profileData,
         email: user?.email || profileData.email,
@@ -107,16 +170,32 @@ export default function Settings() {
 
       if (profile) {
         const { error } = await profileService.updateProfile(profile.id, data)
-        if (error) throw error
+        if (error) {
+          const handled = await handleAuthFailure(error.message)
+          if (handled) return
+          throw error
+        }
         toast.success('Perfil atualizado com sucesso')
       } else {
         const { error } = await profileService.createProfile(data as any)
-        if (error) throw error
+        if (error) {
+          const handled = await handleAuthFailure(error.message)
+          if (handled) return
+          throw error
+        }
         toast.success('Perfil criado com sucesso')
         loadProfile() // Reload to get the created profile
       }
-    } catch (error) {
-      toast.error('Erro ao salvar perfil')
+    } catch (error: any) {
+      if (await handleAuthFailure(error?.message)) {
+        return
+      }
+      const message = String(error?.message || '')
+      if (message.toLowerCase().includes('logo_data') || message.toLowerCase().includes('column')) {
+        toast.error('Coluna logo_data nao existe no banco. Crie a coluna e tente novamente.')
+        return
+      }
+      toast.error(message || 'Erro ao salvar perfil')
     } finally {
       setSaving(false)
     }
@@ -295,6 +374,38 @@ export default function Settings() {
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Adicionar logo (PNG ou JPG)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleLogoChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                    {profileData.logo_data && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <img
+                          src={profileData.logo_data}
+                          alt="Logo"
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                        <span className="text-sm text-gray-500">Logo carregada</span>
+                      </div>
+                    )}
+                    {profileData.logo_data && (
+                      <button
+                        type="button"
+                        onClick={handleLogoRemove}
+                        className="mt-3 px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Remover logo
+                      </button>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">Usado no sidebar e no contrato.</p>
                   </div>
 
                   <div>

@@ -193,7 +193,7 @@ export default function Patients() {
     return contractDaysOfWeek.find(day => day.value === dayOfWeek)?.label || 'Dia'
   }
 
-  const loadSignatureImage = async (src: string) => {
+  const loadImageData = async (src: string) => {
     let dataUrl = src
     if (!src.startsWith('data:')) {
       const response = await fetch(src)
@@ -215,6 +215,13 @@ export default function Patients() {
       image.src = dataUrl
     })
     return { dataUrl, width: img.width, height: img.height }
+  }
+
+  const getImageFormat = (dataUrl: string) => {
+    if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) {
+      return 'JPEG'
+    }
+    return 'PNG'
   }
 
   const handleGenerateContract = async (patient: Patient) => {
@@ -244,13 +251,22 @@ export default function Patients() {
       contractorCrp ? `CRP ${contractorCrp}` : null
     ].filter(Boolean).join(' - ')
     const signatureData = contractProfile?.signature_data?.trim() || ''
+    const logoData = contractProfile?.logo_data?.trim() || ''
     let signatureImage: { dataUrl: string; width: number; height: number } | null = null
+    let logoImage: { dataUrl: string; width: number; height: number } | null = null
 
     if (signatureData) {
       try {
-        signatureImage = await loadSignatureImage(signatureData)
+        signatureImage = await loadImageData(signatureData)
       } catch (error) {
         signatureImage = null
+      }
+    }
+    if (logoData) {
+      try {
+        logoImage = await loadImageData(logoData)
+      } catch (error) {
+        logoImage = null
       }
     }
 
@@ -276,13 +292,45 @@ export default function Patients() {
       })
     }
 
-    const addTitle = (text: string) => {
+    const addHeader = (text: string) => {
+      const logoSize = 48
+      const logoGap = 12
+      const titleX = logoImage ? margin + logoSize + logoGap : margin
+      const titleMaxWidth = pageWidth - margin - titleX
+
       pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(14)
-      const textWidth = pdf.getTextWidth(text)
-      addPageIfNeeded(lineHeight)
-      pdf.text(text, (pageWidth - textWidth) / 2, cursorY)
-      cursorY += lineHeight + 8
+      pdf.setFontSize(12)
+
+      const lines = pdf.splitTextToSize(text, titleMaxWidth) as string[]
+      const blockHeight = Math.max(logoImage ? logoSize : 0, lines.length * lineHeight)
+      addPageIfNeeded(blockHeight)
+
+      if (logoImage) {
+        const ratio = logoImage.width / logoImage.height
+        let logoWidth = logoSize
+        let logoHeight = logoSize
+        if (ratio >= 1) {
+          logoHeight = logoWidth / ratio
+        } else {
+          logoWidth = logoHeight * ratio
+        }
+        const logoY = cursorY
+        pdf.addImage(
+          logoImage.dataUrl,
+          getImageFormat(logoImage.dataUrl),
+          margin,
+          logoY,
+          logoWidth,
+          logoHeight
+        )
+      }
+
+      const titleY = cursorY + 14
+      lines.forEach((line, index) => {
+        pdf.text(line, titleX, titleY + index * lineHeight)
+      })
+
+      cursorY += Math.max(logoImage ? logoSize : 0, lines.length * lineHeight) + 12
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(10)
     }
@@ -303,7 +351,7 @@ export default function Patients() {
       pdf.setFontSize(10)
     }
 
-    addTitle('CONTRATO DE PRESTACAO DE SERVICOS PSICOLOGICOS')
+    addHeader('CONTRATO DE PRESTACAO DE SERVICOS PSICOLOGICOS')
 
     addSectionTitle('DADOS DO PACIENTE', false)
     const addressLineParts = [
@@ -399,7 +447,14 @@ export default function Patients() {
       if (includeImage && signatureImage) {
         const imageX = (pageWidth - imageWidth) / 2
         const imageY = lineY - imageHeight - imageGap
-        pdf.addImage(signatureImage.dataUrl, 'PNG', imageX, imageY, imageWidth, imageHeight)
+        pdf.addImage(
+          signatureImage.dataUrl,
+          getImageFormat(signatureImage.dataUrl),
+          imageX,
+          imageY,
+          imageWidth,
+          imageHeight
+        )
       }
 
       pdf.line(signatureLineX, lineY, signatureLineX + signatureLineWidth, lineY)
