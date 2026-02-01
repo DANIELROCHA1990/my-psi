@@ -3,7 +3,7 @@ import { financialService } from '../services/financialService'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { FinancialRecord, Patient, Session } from '../types'
-import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Calendar, Edit, Trash2, FileText, Clock } from 'lucide-react'
+import { Plus, Search, DollarSign, TrendingUp, TrendingDown, Minus, Edit, Trash2, FileText, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, subMonths, subYears, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -19,8 +19,6 @@ export default function Financial() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(null)
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'next_quarter' | 'next_year' | 'all'>('month')
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all')
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'paid' | 'pending' | 'cancelled'>('all')
   useEffect(() => {
     loadData()
@@ -62,26 +60,18 @@ export default function Financial() {
 
   const resetFilters = () => {
     setDateRange('month')
-    setTransactionTypeFilter('all')
-    setPaymentMethodFilter('all')
     setSessionStatusFilter('all')
   }
 
-  const applyQuickFilter = (preset: 'revenue' | 'pending' | 'pix' | 'quarter') => {
+  const applyQuickFilter = (preset: 'revenue' | 'pending' | 'quarter') => {
     if (preset === 'revenue') {
       setDateRange('month')
-      setTransactionTypeFilter('income')
-      setPaymentMethodFilter('all')
+      setSessionStatusFilter('paid')
       return
     }
     if (preset === 'pending') {
       setDateRange('month')
       setSessionStatusFilter('pending')
-      return
-    }
-    if (preset === 'pix') {
-      setPaymentMethodFilter('pix')
-      setTransactionTypeFilter('income')
       return
     }
     if (preset === 'quarter') {
@@ -142,101 +132,38 @@ export default function Financial() {
   const monthStart = startOfMonth(statsNow)
   const monthEnd = endOfMonth(statsNow)
 
-  const isFutureRange = dateRange === 'next_quarter' || dateRange === 'next_year'
-
-  const statsRecordsBase = records.filter((record) => {
-    if (transactionTypeFilter !== 'all' && record.transaction_type !== transactionTypeFilter) {
+  const summaryRevenueSessions = sessions.filter((session) => {
+    if (session.session_price === null || session.session_price === undefined) {
       return false
     }
-    if (paymentMethodFilter !== 'all' && record.payment_method !== paymentMethodFilter) {
-      return false
-    }
-    return true
+    return session.payment_status === 'paid' || session.payment_status === 'pending'
   })
 
-  const statsRecords = isFutureRange
-    ? statsRecordsBase
-    : statsRecordsBase.filter(recordMatchesRange)
-
-  const statsSessionsBase = sessions.filter((session) => session.payment_status === 'paid')
-  const statsSessions = isFutureRange
-    ? statsSessionsBase
-    : statsSessionsBase.filter(sessionMatchesRange)
-
-  const weeklyRevenueSum = statsSessions
-    .filter((record) => {
-      const recordDate = parseISO(record.session_date)
-      return recordDate >= weekStart && recordDate <= weekEnd
+  const weeklyRevenue = summaryRevenueSessions
+    .filter((session) => {
+      const sessionDate = parseISO(session.session_date)
+      return sessionDate >= weekStart && sessionDate <= weekEnd
     })
-    .reduce((sum, record) => sum + Number(record.session_price || 0), 0)
+    .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
-  const weeklyRevenueCount = statsSessions
-    .filter((record) => {
-      const recordDate = parseISO(record.session_date)
-      return recordDate >= weekStart && recordDate <= weekEnd
-    }).length
-
-  const revenueEnabled = transactionTypeFilter !== 'expense'
-  const weeklyRevenue = revenueEnabled
-    ? ((dateRange === 'next_quarter' || dateRange === 'next_year')
-        ? (weeklyRevenueCount > 0 ? weeklyRevenueSum / weeklyRevenueCount : 0)
-        : weeklyRevenueSum)
-    : 0
-
-  const monthlyRevenueSum = statsSessions
-    .filter((record) => {
-      const recordDate = parseISO(record.session_date)
-      return recordDate >= monthStart && recordDate <= monthEnd
+  const monthlyRevenue = summaryRevenueSessions
+    .filter((session) => {
+      const sessionDate = parseISO(session.session_date)
+      return sessionDate >= monthStart && sessionDate <= monthEnd
     })
-    .reduce((sum, record) => sum + Number(record.session_price || 0), 0)
-  const monthlyRevenue = revenueEnabled ? monthlyRevenueSum : 0
+    .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
-  const weeklyExpensesSum = statsRecords
-    .filter((record) => record.transaction_type === 'expense')
-    .filter((record) => {
-      const recordDate = parseISO(record.transaction_date)
-      if (!isFutureRange && !dateWithinRange(recordDate)) {
-        return false
-      }
-      return recordDate >= weekStart && recordDate <= weekEnd
+  const pendingReceivable = sessions
+    .filter((session) => session.session_price !== null && session.session_price !== undefined)
+    .filter((session) => session.payment_status === 'pending')
+    .filter((session) => {
+      const sessionDate = parseISO(session.session_date)
+      return sessionDate >= monthStart && sessionDate <= monthEnd
     })
-    .reduce((sum, record) => sum + Number(record.amount), 0)
-
-  const weeklyExpensesCount = statsRecords
-    .filter((record) => record.transaction_type === 'expense')
-    .filter((record) => {
-      const recordDate = parseISO(record.transaction_date)
-      if (!isFutureRange && !dateWithinRange(recordDate)) {
-        return false
-      }
-      return recordDate >= weekStart && recordDate <= weekEnd
-    }).length
-
-  const weeklyExpenses = (dateRange === 'next_quarter' || dateRange === 'next_year')
-    ? (weeklyExpensesCount > 0 ? weeklyExpensesSum / weeklyExpensesCount : 0)
-    : weeklyExpensesSum
-
-  const monthlyExpenses = statsRecords
-    .filter((record) => record.transaction_type === 'expense')
-    .filter((record) => {
-      const recordDate = parseISO(record.transaction_date)
-      if (!isFutureRange && !dateWithinRange(recordDate)) {
-        return false
-      }
-      return recordDate >= monthStart && recordDate <= monthEnd
-    })
-    .reduce((sum, record) => sum + Number(record.amount), 0)
-
-  const monthlyBalance = monthlyRevenue - monthlyExpenses
+    .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
   const filteredRecords = records.filter((record) => {
     if (!recordMatchesRange(record)) {
-      return false
-    }
-    if (transactionTypeFilter !== 'all' && record.transaction_type !== transactionTypeFilter) {
-      return false
-    }
-    if (paymentMethodFilter !== 'all' && record.payment_method !== paymentMethodFilter) {
       return false
     }
     const needle = normalizeSearchText(searchTerm.trim())
@@ -254,15 +181,6 @@ export default function Financial() {
 
   const statusChartSessions = sessionsInRange.filter((session) => session.session_price !== null && session.session_price !== undefined)
 
-  const pendingReceivable = sessionsInRange
-    .filter((session) => {
-      if (dateRange === 'month') {
-        return session.payment_status === 'pending'
-      }
-      return session.payment_status === 'paid' || session.payment_status === 'pending'
-    })
-    .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
-
   const revenueSessions = statusChartSessions.filter((session) => {
     if (sessionStatusFilter === 'all') {
       return session.payment_status === 'paid'
@@ -270,48 +188,52 @@ export default function Financial() {
     return session.payment_status === sessionStatusFilter
   })
 
-  const showIncome = transactionTypeFilter === 'all' || transactionTypeFilter === 'income'
-  const showExpense = transactionTypeFilter === 'all' || transactionTypeFilter === 'expense'
-
-  const monthlyMap = new Map<string, { date: Date; month: string; receita: number; despesa: number }>()
-  for (const record of filteredRecords) {
+  const chartYear = statsNow.getFullYear()
+  const monthlyTotals = Array.from({ length: 12 }, () => 0)
+  for (const record of records) {
+    if (record.transaction_type !== 'income') {
+      continue
+    }
     const recordDate = parseISO(record.transaction_date)
-    const monthKey = format(recordDate, 'yyyy-MM')
-    const monthLabel = format(recordDate, 'MMM', { locale: ptBR })
-    const existing = monthlyMap.get(monthKey) || {
-      date: startOfMonth(recordDate),
-      month: monthLabel,
-      receita: 0,
-      despesa: 0
+    if (recordDate.getFullYear() !== chartYear) {
+      continue
     }
-    if (record.transaction_type === 'income') {
-      existing.receita += Number(record.amount)
-    } else {
-      existing.despesa += Number(record.amount)
-    }
-    monthlyMap.set(monthKey, existing)
+    monthlyTotals[recordDate.getMonth()] += Number(record.amount)
   }
 
-  const chartData = Array.from(monthlyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime())
+  const chartData = monthlyTotals.map((value, index) => {
+    const monthLabel = format(new Date(chartYear, index, 1), 'MMM', { locale: ptBR }).replace('.', '')
+    const month = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+    return { month, receita: value }
+  })
 
-  const totals = filteredRecords.reduce(
-    (acc, record) => {
-      if (record.transaction_type === 'income') {
-        acc.income += Number(record.amount)
-      } else {
-        acc.expense += Number(record.amount)
+  const currentMonthIndex = statsNow.getMonth()
+  const previousMonthIndex = currentMonthIndex - 1
+  const currentMonthValue = monthlyTotals[currentMonthIndex] || 0
+  const previousMonthValue = previousMonthIndex >= 0 ? monthlyTotals[previousMonthIndex] || 0 : null
+  const trendInfo = (() => {
+    if (previousMonthValue === null) {
+      return { direction: 'neutral' as const, label: 'Sem comparativo para janeiro.' }
+    }
+    const diff = currentMonthValue - previousMonthValue
+    if (diff === 0) {
+      return { direction: 'neutral' as const, label: 'Estavel em relacao ao mes anterior.' }
+    }
+    const direction = diff > 0 ? 'up' : 'down'
+    if (previousMonthValue > 0) {
+      const percent = Math.abs(diff) / previousMonthValue * 100
+      const verb = diff > 0 ? 'Crescimento' : 'Queda'
+      return {
+        direction,
+        label: `${verb} de ${percent.toFixed(1)}% em relacao ao mes anterior.`
       }
-      return acc
-    },
-    { income: 0, expense: 0 }
-  )
-
-  const pieData = [
-    { name: 'Receitas', value: totals.income, color: '#10b981' },
-    { name: 'Despesas', value: totals.expense, color: '#ef4444' }
-  ]
-
-  const paymentMethods = Array.from(new Set(records.map((record) => record.payment_method))).sort()
+    }
+    const verb = diff > 0 ? 'Crescimento' : 'Queda'
+    return {
+      direction,
+      label: `${verb} sem base no mes anterior.`
+    }
+  })()
 
   const paymentMethodLabels: Record<string, string> = {
     cash: 'Dinheiro',
@@ -320,19 +242,6 @@ export default function Financial() {
     bank_transfer: 'Transferencia',
     pix: 'PIX'
   }
-
-  const paymentMethodData = filteredRecords
-    .filter((record) => record.transaction_type === 'income')
-    .reduce((acc, record) => {
-      const key = record.payment_method || 'other'
-      acc[key] = (acc[key] || 0) + Number(record.amount)
-      return acc
-    }, {} as Record<string, number>)
-
-  const paymentMethodChartData = Object.entries(paymentMethodData).map(([method, value]) => ({
-    name: paymentMethodLabels[method] || method,
-    value
-  }))
 
   const statusLabels: Record<string, string> = {
     paid: 'Pago',
@@ -393,7 +302,7 @@ export default function Financial() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Financeiro</h1>
-          <p className="text-gray-600 mt-2">Controle suas receitas e despesas.</p>
+          <p className="text-gray-600 mt-2">Controle suas receitas.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <a
@@ -416,7 +325,7 @@ export default function Financial() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3">
             <div className="bg-green-50 p-3 rounded-lg">
@@ -440,36 +349,6 @@ export default function Financial() {
               <p className="text-sm font-medium text-gray-600">Receita Mensal</p>
               <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-red-50 p-3 rounded-lg">
-              <TrendingDown className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-600">Despesas Semanais</p>
-              <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
-                R$ {weeklyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-600">Saldo Mensal</p>
-              <p className={`text-xl font-bold whitespace-nowrap ${
-                monthlyBalance >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                R$ {monthlyBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -503,7 +382,7 @@ export default function Financial() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Periodo
@@ -519,39 +398,6 @@ export default function Financial() {
                 <option value="year">Ultimos 12 meses</option>
                 <option value="next_year">Proximos 12 meses</option>
                 <option value="all">Todo o periodo</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de transacao
-              </label>
-              <select
-                value={transactionTypeFilter}
-                onChange={(e) => setTransactionTypeFilter(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="all">Receitas e despesas</option>
-                <option value="income">Somente receitas</option>
-                <option value="expense">Somente despesas</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Metodo de pagamento
-              </label>
-              <select
-                value={paymentMethodFilter}
-                onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="all">Todos</option>
-                {paymentMethods.map((method) => (
-                  <option key={method} value={method}>
-                    {paymentMethodLabels[method] || method}
-                  </option>
-                ))}
               </select>
             </div>
 
@@ -589,13 +435,6 @@ export default function Financial() {
             </button>
             <button
               type="button"
-              onClick={() => applyQuickFilter('pix')}
-              className="px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 rounded-full hover:bg-emerald-100"
-            >
-              PIX
-            </button>
-            <button
-              type="button"
               onClick={() => applyQuickFilter('quarter')}
               className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
             >
@@ -610,11 +449,11 @@ export default function Financial() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Receitas vs Despesas</h3>
-          {chartData.length === 0 ? (
-            <p className="text-sm text-gray-500">Sem dados para os filtros atuais.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Receitas (jan a dez)</h3>
+          {chartData.every((item) => item.receita === 0) ? (
+            <p className="text-sm text-gray-500">Sem dados para o ano atual.</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
@@ -631,36 +470,24 @@ export default function Financial() {
                   tickLine={{ stroke: 'var(--chart-grid)' }}
                 />
                 <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                {showIncome && <Bar dataKey="receita" fill="#10b981" name="Receitas" />}
-                {showExpense && <Bar dataKey="despesa" fill="#ef4444" name="Despesas" />}
+                <Bar dataKey="receita" fill="#10b981" name="Receitas" />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Distribuicao por tipo</h3>
-          {pieData.every((entry) => entry.value === 0) ? (
-            <p className="text-sm text-gray-500">Sem dados para os filtros atuais.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+          <div className="mt-4 flex items-center gap-3 text-sm text-gray-600">
+            <div className={`p-2 rounded-lg ${
+              trendInfo.direction === 'up'
+                ? 'bg-green-50 text-green-600'
+                : trendInfo.direction === 'down'
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-gray-100 text-gray-600'
+            }`}>
+              {trendInfo.direction === 'up' && <TrendingUp className="h-4 w-4" />}
+              {trendInfo.direction === 'down' && <TrendingDown className="h-4 w-4" />}
+              {trendInfo.direction === 'neutral' && <Minus className="h-4 w-4" />}
+            </div>
+            <span>{trendInfo.label}</span>
+          </div>
         </div>
       </div>
 
@@ -734,32 +561,7 @@ export default function Financial() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Metodo de pagamento (receitas)</h3>
-          {paymentMethodChartData.length === 0 ? (
-            <p className="text-sm text-gray-500">Sem receitas para os filtros atuais.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={paymentMethodChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: 'var(--chart-text)' }}
-                  axisLine={{ stroke: 'var(--chart-grid)' }}
-                  tickLine={{ stroke: 'var(--chart-grid)' }}
-                />
-                <YAxis
-                  tick={{ fill: 'var(--chart-text)' }}
-                  axisLine={{ stroke: 'var(--chart-grid)' }}
-                  tickLine={{ stroke: 'var(--chart-grid)' }}
-                />
-                <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                <Bar dataKey="value" fill="#10b981" name="Receitas" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      <div className="grid grid-cols-1 gap-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Dicas de analise</h3>
           <div className="space-y-4 text-sm text-gray-600">
@@ -767,7 +569,7 @@ export default function Financial() {
               Use o filtro de status para comparar receita recebida vs pendente.
             </div>
             <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-              Combine periodo + metodo de pagamento para identificar preferencia dos pacientes.
+              Combine periodo + status da sessao para acompanhar valores pendentes.
             </div>
             <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
               Ajuste a frequencia para ver impacto direto no faturamento esperado.
@@ -821,7 +623,7 @@ export default function Financial() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                         <span>{format(parseISO(record.transaction_date), 'dd/MM/yyyy')}</span>
-                        <span className="capitalize">{record.payment_method}</span>
+                        <span>{paymentMethodLabels[record.payment_method] || record.payment_method}</span>
                         {record.category && <span>{record.category}</span>}
                       </div>
                     </div>
@@ -925,7 +727,6 @@ function FinancialModal({
     patient_id: record?.patient_id || '',
     amount: record?.amount?.toString() || '',
     description: record?.description || '',
-    payment_method: record?.payment_method || 'cash',
     transaction_date: record?.transaction_date ? format(new Date(record.transaction_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
     category: record?.category || ''
   })
@@ -947,7 +748,7 @@ function FinancialModal({
         patient_id: formData.patient_id || undefined,
         amount: Number(formData.amount),
         description: formData.description || undefined,
-        payment_method: formData.payment_method,
+        payment_method: 'cash',
         transaction_date: formData.transaction_date,
         category: formData.category || undefined
       }
@@ -956,10 +757,11 @@ function FinancialModal({
 
       if (record) {
         const updateData = {
-        ...formData,
-        amount: Number(formData.amount),
-        patient_id: formData.patient_id || null
-      }
+          ...formData,
+          amount: Number(formData.amount),
+          patient_id: formData.patient_id || null,
+          payment_method: 'cash'
+        }
         const { error } = await financialService.updateFinancialRecord(record.id, updateData)
         if (error) throw error
         toast.success('Transação atualizada com sucesso')
@@ -1049,24 +851,6 @@ function FinancialModal({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               placeholder="Descrição da transação..."
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Método de Pagamento *
-            </label>
-            <select
-              required
-              value={formData.payment_method}
-              onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            >
-              <option value="cash">Dinheiro</option>
-              <option value="credit_card">Cartão de Crédito</option>
-              <option value="debit_card">Cartão de Débito</option>
-              <option value="bank_transfer">Transferência</option>
-              <option value="pix">PIX</option>
-            </select>
           </div>
           
           <div>

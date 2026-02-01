@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { financialService } from '../services/financialService'
+import { supabase } from '../lib/supabase'
 import { Patient, Session, FinancialRecord } from '../types'
 import { 
   Users, 
@@ -11,10 +12,12 @@ import {
   TrendingUp,
   Clock,
   AlertCircle,
-  FileText
+  FileText,
+  Link2
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import toast from 'react-hot-toast'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -29,6 +32,8 @@ export default function Dashboard() {
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([])
   const [recentTransactions, setRecentTransactions] = useState<FinancialRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [scheduleLink, setScheduleLink] = useState('')
+  const [scheduleLinkLoading, setScheduleLinkLoading] = useState(false)
 
   useEffect(() => {
     loadDashboardData()
@@ -74,6 +79,72 @@ export default function Dashboard() {
     }
   }
 
+  const buildScheduleLink = (token: string) => {
+    if (typeof window === 'undefined') {
+      return ''
+    }
+    return `${window.location.origin}/link-de-agendamento?token=${token}`
+  }
+
+  const handleGenerateScheduleLink = async () => {
+    if (!user) {
+      toast.error('Usuario nao autenticado')
+      return
+    }
+
+    try {
+      setScheduleLinkLoading(true)
+      const { data, error } = await supabase
+        .from('public_schedule_links')
+        .select('token')
+        .eq('user_id', user.id)
+        .is('revoked_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (error) throw error
+
+      const existingToken = data?.[0]?.token
+      if (existingToken) {
+        setScheduleLink(buildScheduleLink(existingToken))
+        toast.success('Link carregado com sucesso')
+        return
+      }
+
+      const newToken = crypto.randomUUID().replace(/-/g, '')
+      const { data: created, error: insertError } = await supabase
+        .from('public_schedule_links')
+        .insert({ user_id: user.id, token: newToken })
+        .select('token')
+        .single()
+
+      if (insertError) throw insertError
+
+      const token = created?.token || newToken
+      setScheduleLink(buildScheduleLink(token))
+      toast.success('Link gerado com sucesso')
+    } catch (error) {
+      console.error('Erro ao gerar link de agendamento:', error)
+      toast.error('Falha ao gerar link de agendamento')
+    } finally {
+      setScheduleLinkLoading(false)
+    }
+  }
+
+  const handleCopyScheduleLink = async () => {
+    if (!scheduleLink) {
+      toast.error('Gere o link primeiro')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(scheduleLink)
+      toast.success('Link copiado')
+    } catch (error) {
+      toast.error('Falha ao copiar link')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -85,12 +156,52 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Bem-vindo de volta! Aqui está um resumo da sua prática.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            Bem-vindo de volta! Aqui está um resumo da sua prática.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerateScheduleLink}
+          disabled={scheduleLinkLoading}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          <Link2 className="h-4 w-4" />
+          {scheduleLinkLoading ? 'Gerando...' : 'Gerar link de agendamento'}
+        </button>
       </div>
+
+      {(scheduleLink || scheduleLinkLoading) && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Link de agendamento</h2>
+              <p className="text-sm text-gray-600">
+                Compartilhe com o paciente para ele preencher os dados e reservar horario.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyScheduleLink}
+              disabled={!scheduleLink}
+              className="px-4 py-2 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-60"
+            >
+              Copiar link
+            </button>
+          </div>
+          <div className="mt-4">
+            <input
+              type="text"
+              readOnly
+              value={scheduleLink || 'Gerando link...'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">

@@ -49,6 +49,7 @@ export interface Patient {
   auto_renew_sessions?: boolean
   session_schedules?: SessionSchedule[]
   active: boolean
+  is_temp?: boolean
   updated_at?: string
 }
 

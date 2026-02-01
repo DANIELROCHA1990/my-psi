@@ -22,6 +22,7 @@ export default function Patients() {
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [reactivateMode, setReactivateMode] = useState(false)
   const [copyingLinkFor, setCopyingLinkFor] = useState<string | null>(null)
+  const [approvalMode, setApprovalMode] = useState(false)
 
   useEffect(() => {
     loadPatients()
@@ -494,7 +495,7 @@ export default function Patients() {
           <p className="text-gray-600 mt-2">Gerencie seus pacientes e suas informações.</p>
         </div>
         <button
-          onClick={() => { setReactivateMode(false); setShowAddForm(true) }}
+          onClick={() => { setReactivateMode(false); setApprovalMode(false); setShowAddForm(true) }}
           className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
         >
           <Plus className="h-5 w-5" />
@@ -581,13 +582,19 @@ export default function Patients() {
                     <div className="min-w-0">
                       <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
                         {patient.full_name}
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          patient.active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {patient.active ? 'Ativo' : 'Inativo'}
-                        </span>
+                        {patient.is_temp ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Pendente
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            patient.active 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {patient.active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        )}
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mt-1">
                         {patient.email && (
@@ -618,46 +625,59 @@ export default function Patients() {
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
-                    <button
-                      onClick={() => void handleCopyPushLink(patient)}
-                      className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-60"
-                      title="Copiar link de lembretes"
-                      aria-label="Copiar link de lembretes"
-                      disabled={copyingLinkFor === patient.id}
-                    >
-                      <Link2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => { setReactivateMode(false); setEditingPatient(patient) }}
-                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                      title="Editar paciente"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => { void handleGenerateContract(patient) }}
-                      className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                      title="Gerar contrato"
-                      aria-label="Gerar contrato"
-                    >
-                      <FileText className="h-4 w-4" />
-                    </button>
-                    {patient.active ? (
+                    {patient.is_temp ? (
                       <button
-                        onClick={() => handleDeactivate(patient)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Inativar paciente"
-                      >
-                        <UserX className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleActivate(patient)}
-                        className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Reativar paciente"
+                        onClick={() => { setReactivateMode(false); setApprovalMode(true); setEditingPatient(patient) }}
+                        className="px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-2"
+                        title="Aprovar paciente"
                       >
                         <UserCheck className="h-4 w-4" />
+                        Aprovar paciente
                       </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => void handleCopyPushLink(patient)}
+                          className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-60"
+                          title="Copiar link de lembretes"
+                          aria-label="Copiar link de lembretes"
+                          disabled={copyingLinkFor === patient.id}
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setReactivateMode(false); setApprovalMode(false); setEditingPatient(patient) }}
+                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Editar paciente"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { void handleGenerateContract(patient) }}
+                          className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Gerar contrato"
+                          aria-label="Gerar contrato"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </button>
+                        {patient.active ? (
+                          <button
+                            onClick={() => handleDeactivate(patient)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Inativar paciente"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleActivate(patient)}
+                            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Reativar paciente"
+                          >
+                            <UserCheck className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -680,7 +700,7 @@ export default function Patients() {
             </p>
             {!searchTerm && (
               <button
-                onClick={() => { setReactivateMode(false); setShowAddForm(true) }}
+                onClick={() => { setReactivateMode(false); setApprovalMode(false); setShowAddForm(true) }}
                 className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
                 Cadastrar Primeiro Paciente
@@ -695,16 +715,19 @@ export default function Patients() {
         <PatientModal
           patient={editingPatient}
           forceManageAutoSessions={reactivateMode}
+          approvalMode={approvalMode}
           onClose={() => {
             setShowAddForm(false)
             setEditingPatient(null)
             setReactivateMode(false)
+            setApprovalMode(false)
           }}
           onSave={() => {
             loadPatients()
             setShowAddForm(false)
             setEditingPatient(null)
             setReactivateMode(false)
+            setApprovalMode(false)
           }}
         />
       )}
@@ -717,12 +740,14 @@ function PatientModal({
   patient, 
   onClose, 
   onSave,
-  forceManageAutoSessions = false
+  forceManageAutoSessions = false,
+  approvalMode = false
 }: { 
   patient: Patient | null
   onClose: () => void
   onSave: () => void
   forceManageAutoSessions?: boolean
+  approvalMode?: boolean
 }) {
   const normalizeHexColorValue = (value: string) => {
     const trimmed = value.trim()
@@ -735,7 +760,9 @@ function PatientModal({
 
   const isValidHexColor = (value: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(value)
 
+  const isApproval = Boolean(approvalMode && patient?.is_temp)
   const initialCalendarColor = patient?.calendar_color ?? (patient ? '' : '#10b981')
+  const initialActive = patient?.is_temp ? true : patient?.active ?? true
   const [formData, setFormData] = useState({
     full_name: patient?.full_name || '',
     email: patient?.email || '',
@@ -754,7 +781,7 @@ function PatientModal({
     session_frequency: patient?.session_frequency || 'weekly',
     session_price: patient?.session_price?.toString() || '',
     session_link: patient?.session_link || '',
-    active: patient?.active ?? true,
+    active: initialActive,
     auto_renew_sessions: patient?.auto_renew_sessions ?? false,
     calendar_color: initialCalendarColor
   })
@@ -986,6 +1013,11 @@ function PatientModal({
         therapy_goals: formData.therapy_goals || undefined
       }
 
+      if (isApproval) {
+        patientData.is_temp = false
+        patientData.active = true
+      }
+
       const schedulesChanged = patient
         ? JSON.stringify(normalizeSchedulesForCompare(sessionSchedules)) !==
           JSON.stringify(normalizeSchedulesForCompare((patient.session_schedules as SessionSchedule[] | undefined) || []))
@@ -1011,7 +1043,9 @@ function PatientModal({
 
         const { error } = await patientService.updatePatient(patient.id, patientData)
         if (error) throw error
-        if (deactivatingPatient) {
+        if (isApproval) {
+          toast.success('Paciente aprovado com sucesso')
+        } else if (deactivatingPatient) {
           const { error: deactivateError } = await patientService.deactivatePatient(patient.id)
           if (deactivateError) {
             toast.error('Paciente atualizado, mas erro ao apagar sessoes futuras')
@@ -1089,7 +1123,7 @@ function PatientModal({
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            {patient ? 'Editar Paciente' : 'Novo Paciente'}
+            {isApproval ? 'Aprovar Paciente' : (patient ? 'Editar Paciente' : 'Novo Paciente')}
           </h2>
         </div>
         
@@ -1160,19 +1194,21 @@ function PatientModal({
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={formData.active ? 'true' : 'false'}
-                  onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.value === 'true' }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                >
-                  <option value="true">Ativo</option>
-                  <option value="false">Inativo</option>
-                </select>
-              </div>
+              {!isApproval && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.active ? 'true' : 'false'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.value === 'true' }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="true">Ativo</option>
+                    <option value="false">Inativo</option>
+                  </select>
+                </div>
+              )}
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">

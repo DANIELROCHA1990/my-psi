@@ -13,6 +13,7 @@ import Financial from './pages/Financial'
 import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
 import PushAgendaPreview from './pages/PushAgendaPreview'
+import ScheduleLink from './pages/ScheduleLink'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/notificacoes" element={<Notifications />} />
         <Route path="/push" element={<Navigate to="/notificacoes" replace />} />
         <Route path="/push/agenda" element={<PushAgendaPreview />} />
+        <Route path="/link-de-agendamento" element={<ScheduleLink />} />
         <Route
           path="/auth"
           element={user ? <Navigate to="/" replace /> : <AuthForm />}
