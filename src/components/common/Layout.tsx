@@ -190,7 +190,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Static sidebar for desktop */}
-      <div className={`hidden md:flex ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'} md:flex-col md:fixed md:inset-y-0`}>
+      <div className={`hidden md:flex ${sidebarCollapsed ? 'md:w-20' : 'md:w-52'} md:flex-col md:fixed md:inset-y-0`}>
         <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             {sidebarCollapsed ? (
@@ -303,7 +303,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className={`${sidebarCollapsed ? 'md:pl-20' : 'md:pl-64'} flex flex-col flex-1 min-w-0`}>
+      <div className={`${sidebarCollapsed ? 'md:pl-20' : 'md:pl-56'} flex flex-col flex-1 min-w-0`}>
         <div className="fixed top-3 left-3 z-30 md:hidden">
           <button
             type="button"

@@ -204,11 +204,11 @@ export default function Dashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-50 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-emerald-600" />
+      <div className="grid grid-cols-5 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <Users className="h-5 w-5 text-emerald-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Pacientes Ativos</p>
@@ -217,10 +217,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-50 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-600" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-green-50 p-2 rounded-lg">
+              <Calendar className="h-5 w-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Próximas Sessões</p>
@@ -229,10 +229,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <DollarSign className="h-6 w-6 text-yellow-600" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <DollarSign className="h-5 w-5 text-yellow-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Semanal</p>
@@ -243,10 +243,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-purple-600" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-purple-50 p-2 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">Receita Mensal</p>
@@ -257,10 +257,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-yellow-600" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-yellow-50 p-2 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-600">A Receber</p>
