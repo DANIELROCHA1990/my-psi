@@ -92,16 +92,6 @@ function isValidHexColor(value: string): boolean {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(value)
 }
 
-function getReadableTextColor(hexColor: string): string {
-  const raw = hexColor.replace('#', '')
-  const expanded = raw.length === 3 ? raw.split('').map((char) => char + char).join('') : raw
-  const r = parseInt(expanded.slice(0, 2), 16)
-  const g = parseInt(expanded.slice(2, 4), 16)
-  const b = parseInt(expanded.slice(4, 6), 16)
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000
-  return yiq >= 160 ? '#1f2937' : '#f9fafb'
-}
-
 function SessionEditModal({
   session,
   allSessions,
@@ -680,37 +670,27 @@ export default function Calendar() {
                       </span>
                       
                       {daySessions.length > 0 && (
-                        <div className="mt-1 space-y-1">
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
                           {daySessions.slice(0, 2).map((session) => {
                             const patientColor = getSessionColor(session)
-                            const chipStyle = patientColor
-                              ? { backgroundColor: patientColor, color: getReadableTextColor(patientColor) }
-                              : undefined
-                            const chipClassName = patientColor
-                              ? 'text-xs px-1 py-0.5 rounded truncate'
-                              : `text-xs px-1 py-0.5 rounded truncate ${
-                                  session.payment_status === 'paid' 
-                                    ? 'bg-green-100 text-green-800'
-                                    : session.payment_status === 'pending'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`
-
+                            const fallbackColor = session.payment_status === 'paid'
+                              ? '#86efac'
+                              : session.payment_status === 'pending'
+                              ? '#fde047'
+                              : '#e5e7eb'
                             return (
-                              <div
+                              <span
                                 key={session.id}
-                                className={chipClassName}
-                                style={chipStyle}
-                              >
-                                {/* Formatar a hora da sessão, que é UTC, para o fuso horário local para exibição */}
-                                {format(parseUTC(session.session_date), 'HH:mm')}
-                              </div>
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: patientColor || fallbackColor }}
+                                aria-label="Sessao agendada"
+                              />
                             )
                           })}
                           {daySessions.length > 2 && (
-                            <div className="text-xs text-gray-500">
-                              +{daySessions.length - 2} mais
-                            </div>
+                            <span className="text-[10px] text-gray-500">
+                              +{daySessions.length - 2}
+                            </span>
                           )}
                         </div>
                       )}

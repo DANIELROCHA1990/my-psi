@@ -128,6 +128,31 @@ const buildAgendaHtml = (
   professional?: string | null,
   location?: string | null
 ) => {
+  const notesItems = sessions
+    .map((session) => {
+      const notes = (session.summary || session.session_notes || '').trim()
+      if (!notes) {
+        return null
+      }
+      const patientName = session.patients?.full_name || 'Paciente'
+      return `<li style="margin: 6px 0; color: #4b5563;"><strong>Obs ${escapeHtml(
+        patientName
+      )}:</strong> ${escapeHtml(notes)}</li>`
+    })
+    .filter(Boolean)
+    .join('')
+
+  const notesSection = notesItems
+    ? `
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+        <p style="margin: 0 0 8px; font-weight: 600; color: #111827;">Observacoes</p>
+        <ul style="margin: 0; padding-left: 16px;">
+          ${notesItems}
+        </ul>
+      </div>
+    `
+    : ''
+
   const rows = sessions.length
     ? sessions
         .map((session) => {
@@ -135,7 +160,6 @@ const buildAgendaHtml = (
           const statusColors = getStatusColors(session.payment_status)
           const price =
             session.session_price !== null ? formatCurrency(session.session_price) : 'Valor nao informado'
-          const notes = session.summary || session.session_notes || ''
           return `
             <tr>
               <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">${escapeHtml(
@@ -147,18 +171,12 @@ const buildAgendaHtml = (
               <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">${
                 session.duration_minutes ?? 50
               } min</td>
-              <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">${escapeHtml(
-                formatSessionTypeLabel(session.session_type)
-              )}</td>
               <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">
                 <span style="background: ${statusColors.badgeBg}; color: ${statusColors.badgeText}; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;">
                   ${statusLabel}
                 </span>
               </td>
               <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">${price}</td>
-              <td style="padding: 10px 12px; border-top: 1px solid #e5e7eb;">${
-                notes ? escapeHtml(notes) : '-'
-              }</td>
             </tr>
           `
         })
@@ -193,10 +211,8 @@ const buildAgendaHtml = (
                     <th style="padding: 10px 12px;">Horario</th>
                     <th style="padding: 10px 12px;">Paciente</th>
                     <th style="padding: 10px 12px;">Duracao</th>
-                    <th style="padding: 10px 12px;">Sessao</th>
                     <th style="padding: 10px 12px;">Status</th>
                     <th style="padding: 10px 12px;">Valor</th>
-                    <th style="padding: 10px 12px;">Observacoes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -206,6 +222,7 @@ const buildAgendaHtml = (
             `
             : ''
         }
+        ${notesSection}
       </div>
     </div>
   `
@@ -230,13 +247,25 @@ const buildAgendaText = (
   const lines = sessions.map((session) => {
     const price =
       session.session_price !== null ? formatCurrency(session.session_price) : 'Valor nao informado'
-    const notes = session.summary || session.session_notes || '-'
     return `${session.session_date} | ${session.patients?.full_name || 'Paciente'} | ${
       session.duration_minutes ?? 50
-    } min | ${formatSessionTypeLabel(session.session_type)} | ${getStatusLabel(session.payment_status)} | ${price} | ${notes}`
+    } min | ${getStatusLabel(session.payment_status)} | ${price}`
   })
 
-  return `${headerLines.join('\n')}\n\n${lines.join('\n')}`
+  const notesLines = sessions
+    .map((session) => {
+      const notes = (session.summary || session.session_notes || '').trim()
+      if (!notes) {
+        return null
+      }
+      const patientName = session.patients?.full_name || 'Paciente'
+      return `Obs ${patientName}: ${notes}`
+    })
+    .filter(Boolean)
+
+  const notesBlock = notesLines.length ? `\n\nObservacoes:\n${notesLines.join('\n')}` : ''
+
+  return `${headerLines.join('\n')}\n\n${lines.join('\n')}${notesBlock}`
 }
 
 serve(async (req) => {

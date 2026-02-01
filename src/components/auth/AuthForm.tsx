@@ -1,17 +1,13 @@
 import React, { useState } from 'react'
 import { authService } from '../../services/authService'
-import { profileService } from '../../services/profileService'
-import { Brain, Mail, Lock, Eye, EyeOff, User, Hash } from 'lucide-react'
+import { Brain, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AuthForm() {
-  const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    full_name: '',
     email: '',
-    crp_number: '',
     password: ''
   })
 
@@ -20,54 +16,13 @@ export default function AuthForm() {
     setLoading(true)
 
     try {
-      if (isLogin) {
-        const { error } = await authService.signIn(formData.email, formData.password)
-        if (error) throw error
-        toast.success('Login realizado com sucesso!')
-      } else {
-        const fullName = formData.full_name.trim()
-        const crpNumber = formData.crp_number.trim()
-
-        if (!fullName || !crpNumber) {
-          toast.error('Preencha nome completo e numero CRP.')
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await authService.signUp(formData.email, formData.password)
-        if (error) throw error
-
-        if (data?.user) {
-          const { error: profileError } = await profileService.createProfile({
-            user_id: data.user.id,
-            full_name: fullName,
-            crp_number: crpNumber,
-            email: formData.email
-          } as any)
-          if (profileError) throw profileError
-        }
-
-        toast.success('Conta criada com sucesso!')
-      }
+      const { error } = await authService.signIn(formData.email, formData.password)
+      if (error) throw error
+      toast.success('Login realizado com sucesso!')
     } catch (error: any) {
       toast.error(error.message || 'Erro ao autenticar')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleForgotPassword = async () => {
-    if (!formData.email) {
-      toast.error('Digite seu email primeiro')
-      return
-    }
-
-    try {
-      const { error } = await authService.resetPassword(formData.email)
-      if (error) throw error
-      toast.success('Email de recuperacao enviado!')
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao enviar email')
     }
   }
 
@@ -90,29 +45,6 @@ export default function AuthForm() {
 
         <div className="bg-white py-8 px-6 shadow-lg rounded-lg border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {!isLogin && (
-              <div>
-                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome completo
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="full_name"
-                    name="full_name"
-                    type="text"
-                    required
-                    value={formData.full_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                    placeholder="Seu nome completo"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email
@@ -133,29 +65,6 @@ export default function AuthForm() {
                 />
               </div>
             </div>
-
-            {!isLogin && (
-              <div>
-                <label htmlFor="crp_number" className="block text-sm font-medium text-gray-700 mb-2">
-                  Numero CRP
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Hash className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="crp_number"
-                    name="crp_number"
-                    type="text"
-                    required
-                    value={formData.crp_number}
-                    onChange={(e) => setFormData(prev => ({ ...prev, crp_number: e.target.value }))}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                    placeholder="Ex: 11/20792"
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
@@ -195,35 +104,8 @@ export default function AuthForm() {
                 disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {loading ? 'Aguarde...' : (isLogin ? 'Entrar' : 'Criar Conta')}
+                {loading ? 'Aguarde...' : 'Entrar'}
               </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin)
-                  setFormData(prev => ({
-                    ...prev,
-                    full_name: '',
-                    crp_number: ''
-                  }))
-                }}
-                className="text-sm text-emerald-600 hover:text-emerald-500"
-              >
-                {isLogin ? 'Criar nova conta' : 'Ja tenho conta'}
-              </button>
-
-              {isLogin && (
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-sm text-emerald-600 hover:text-emerald-500"
-                >
-                  Esqueci a senha
-                </button>
-              )}
             </div>
           </form>
         </div>
