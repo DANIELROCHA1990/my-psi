@@ -4,7 +4,7 @@ import { profileService } from '../services/profileService'
 import { sessionService } from '../services/sessionService'
 import { supabase } from '../lib/supabase'
 import { Patient, Profile, Session, SessionSchedule } from '../types'
-import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText, Link2 } from 'lucide-react'
+import { Plus, Search, Edit, UserX, UserCheck, User, Phone, Mail, MapPin, Calendar, Activity, Clock, FileText, Link2, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { addDays, addWeeks, format, parseISO } from 'date-fns'
 import { normalizeSearchText } from '../lib/search'
@@ -23,6 +23,8 @@ export default function Patients() {
   const [reactivateMode, setReactivateMode] = useState(false)
   const [copyingLinkFor, setCopyingLinkFor] = useState<string | null>(null)
   const [approvalMode, setApprovalMode] = useState(false)
+  const [rejectingPatient, setRejectingPatient] = useState<Patient | null>(null)
+  const [rejectingLoading, setRejectingLoading] = useState(false)
 
   useEffect(() => {
     loadPatients()
@@ -68,6 +70,25 @@ export default function Patients() {
   const handleActivate = (patient: Patient) => {
     setReactivateMode(true)
     setEditingPatient({ ...patient, active: true })
+  }
+
+  const handleRejectPatient = async () => {
+    if (!rejectingPatient) return
+
+    try {
+      setRejectingLoading(true)
+      const { error } = await patientService.deletePatient(rejectingPatient.id)
+      if (error) throw error
+
+      setPatients(prev => prev.filter(p => p.id !== rejectingPatient.id))
+      toast.success('Paciente recusado e removido')
+      setRejectingPatient(null)
+    } catch (error) {
+      console.error('Erro ao recusar paciente:', error)
+      toast.error('Erro ao recusar paciente')
+    } finally {
+      setRejectingLoading(false)
+    }
   }
 
   const copyTextToClipboard = async (value: string) => {
@@ -626,14 +647,24 @@ export default function Patients() {
                   
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                     {patient.is_temp ? (
-                      <button
-                        onClick={() => { setReactivateMode(false); setApprovalMode(true); setEditingPatient(patient) }}
-                        className="px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-2"
-                        title="Aprovar paciente"
-                      >
-                        <UserCheck className="h-4 w-4" />
-                        Aprovar paciente
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => { setReactivateMode(false); setApprovalMode(true); setEditingPatient(patient) }}
+                          className="px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-2"
+                          title="Aprovar paciente"
+                        >
+                          <UserCheck className="h-4 w-4" />
+                          Aprovar paciente
+                        </button>
+                        <button
+                          onClick={() => setRejectingPatient(patient)}
+                          className="px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-2"
+                          title="Recusar paciente"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Recusar paciente
+                        </button>
+                      </div>
                     ) : (
                       <>
                         <button
@@ -730,6 +761,39 @@ export default function Patients() {
             setApprovalMode(false)
           }}
         />
+      )}
+
+      {rejectingPatient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Recusar paciente</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                Tem certeza que deseja recusar <span className="font-semibold">{rejectingPatient.full_name}</span>?
+                Os dados serão completamente excluídos.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRejectingPatient(null)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectPatient}
+                  disabled={rejectingLoading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                >
+                  {rejectingLoading ? 'Excluindo...' : 'Recusar e excluir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1022,8 +1086,9 @@ function PatientModal({
         ? JSON.stringify(normalizeSchedulesForCompare(sessionSchedules)) !==
           JSON.stringify(normalizeSchedulesForCompare((patient.session_schedules as SessionSchedule[] | undefined) || []))
         : true
+      const frequencyChanged = patient ? patient.session_frequency !== formData.session_frequency : false
       const deactivatingPatient = Boolean(patient?.active && patientData.active === false)
-      const shouldCheckSchedules = sessionSchedules.length > 0 && !deactivatingPatient
+      const shouldCheckSchedules = sessionSchedules.length > 0 && !deactivatingPatient && (schedulesChanged || frequencyChanged)
 
       if (patient) {
         if (shouldCheckSchedules) {
@@ -1052,7 +1117,7 @@ function PatientModal({
           } else {
             toast.success('Paciente inativado e sessoes futuras removidas')
           }
-        } else if (manageAutoSessions && sessionSchedules.length > 0 && schedulesChanged) {
+        } else if (manageAutoSessions && sessionSchedules.length > 0 && (schedulesChanged || frequencyChanged)) {
           try {
             await sessionService.replaceFutureSessions(
               patient.id,
