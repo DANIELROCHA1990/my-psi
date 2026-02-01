@@ -56,6 +56,13 @@ const buildError = (message: string, status = 400) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 
+const buildDbError = (context: string, error: any, status = 500) => {
+  console.error(context, error)
+  const details = error?.details || error?.hint || error?.message
+  const message = details ? `${context}: ${details}` : context
+  return buildError(message, status)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -94,11 +101,10 @@ serve(async (req) => {
     .maybeSingle()
 
   if (linkError) {
-    console.error('Erro ao buscar link:', linkError)
-    return buildError('Failed to validate link', 500)
+    return buildDbError('Erro ao buscar link', linkError)
   }
 
-  if (!link || link.revoked_at) {
+  if (!link || link.revoked_at || !link.user_id) {
     return buildError('Link invalido ou expirado', 404)
   }
 
@@ -125,8 +131,7 @@ serve(async (req) => {
       .order('session_date', { ascending: true })
 
     if (sessionsError) {
-      console.error('Erro ao buscar sessoes:', sessionsError)
-      return buildError('Failed to fetch sessions', 500)
+      return buildDbError('Erro ao buscar sessoes', sessionsError)
     }
 
     return new Response(JSON.stringify({ ok: true, sessions: sessions || [] }), {
@@ -183,8 +188,7 @@ serve(async (req) => {
       .neq('payment_status', 'cancelled')
 
     if (sessionsError) {
-      console.error('Erro ao validar sessoes:', sessionsError)
-      return buildError('Failed to validate sessions', 500)
+      return buildDbError('Erro ao validar sessoes', sessionsError)
     }
 
     const conflict = findConflict((existingSessions || []) as SessionRow[], dateTime)
@@ -218,8 +222,7 @@ serve(async (req) => {
       .single()
 
     if (patientError || !createdPatient) {
-      console.error('Erro ao criar paciente:', patientError)
-      return buildError('Failed to create patient', 500)
+      return buildDbError('Erro ao criar paciente', patientError)
     }
 
     const { data: createdSession, error: sessionError } = await adminClient
@@ -237,8 +240,7 @@ serve(async (req) => {
       .single()
 
     if (sessionError || !createdSession) {
-      console.error('Erro ao criar sessao:', sessionError)
-      return buildError('Failed to create session', 500)
+      return buildDbError('Erro ao criar sessao', sessionError)
     }
 
     return new Response(

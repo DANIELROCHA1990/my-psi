@@ -49,6 +49,34 @@ const buildSlotsForDate = (dateString: string) => {
   return slots
 }
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+const callPublicSchedule = async (payload: Record<string, unknown>) => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase nao configurado')
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/public-schedule`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`
+    },
+    body: JSON.stringify(payload)
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data?.error || `Erro ao processar (${response.status})`)
+  }
+  if (!data?.ok) {
+    throw new Error(data?.error || 'Falha ao processar')
+  }
+  return data
+}
+
 export default function ScheduleLink() {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
@@ -128,22 +156,12 @@ export default function ScheduleLink() {
     const loadAvailability = async () => {
       try {
         setLoadingAvailability(true)
-        const { data, error } = await supabase.functions.invoke('public-schedule', {
-          body: {
-            action: 'availability',
-            token: activeToken,
-            date: selectedDate,
-            timezone: getTimezoneOffsetString()
-          }
+        const data = await callPublicSchedule({
+          action: 'availability',
+          token: activeToken,
+          date: selectedDate,
+          timezone: getTimezoneOffsetString()
         })
-
-        if (error) {
-          throw error
-        }
-
-        if (!data?.ok) {
-          throw new Error(data?.error || 'Falha ao buscar horarios')
-        }
 
         const sessions = (data.sessions || []) as AvailabilitySession[]
         setAvailabilitySessions(sessions)
@@ -237,25 +255,14 @@ export default function ScheduleLink() {
 
     setSubmitting(true)
     try {
-      const { data, error } = await supabase.functions.invoke('public-schedule', {
-        body: {
-          action: 'book',
-          token: activeToken,
-          date: selectedDate,
-          time: selectedTime,
-          timezone: getTimezoneOffsetString(),
-          patient: formData
-        }
+      await callPublicSchedule({
+        action: 'book',
+        token: activeToken,
+        date: selectedDate,
+        time: selectedTime,
+        timezone: getTimezoneOffsetString(),
+        patient: formData
       })
-
-      if (error) {
-        const contextError = (error as any)?.context?.error
-        throw new Error(contextError || error.message || 'Falha ao agendar')
-      }
-
-      if (!data?.ok) {
-        throw new Error(data?.error || 'Falha ao agendar')
-      }
 
       setDone(true)
       toast.success('Agendamento solicitado')
