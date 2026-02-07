@@ -127,7 +127,7 @@ export default function Settings() {
     if (!normalized.includes('refresh token') && !normalized.includes('jwt')) {
       return false
     }
-    toast.error('Sessao expirada. Faça login novamente.')
+    toast.error('Sessão expirada. Faça login novamente.')
     await authService.signOut()
     navigate('/auth')
     return true
@@ -192,7 +192,7 @@ export default function Settings() {
       }
       const message = String(error?.message || '')
       if (message.toLowerCase().includes('logo_data') || message.toLowerCase().includes('column')) {
-        toast.error('Coluna logo_data nao existe no banco. Crie a coluna e tente novamente.')
+        toast.error('Coluna logo_data não existe no banco. Crie a coluna e tente novamente.')
         return
       }
       toast.error(message || 'Erro ao salvar perfil')
@@ -205,7 +205,7 @@ export default function Settings() {
     e.preventDefault()
     
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('As senhas nao coincidem')
+      toast.error('As senhas não coincidem')
       return
     }
 
@@ -245,8 +245,8 @@ export default function Settings() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Configuracoes</h1>
-        <p className="text-gray-600 mt-2">Gerencie suas informacoes pessoais e preferencias.</p>
+        <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
+        <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e preferencias.</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -276,7 +276,7 @@ export default function Settings() {
             >
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                Seguranca
+                Segurança
               </div>
             </button>
           </nav>
@@ -287,7 +287,7 @@ export default function Settings() {
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Informacoes Pessoais</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -342,13 +342,13 @@ export default function Settings() {
                       value={profileData.specialty}
                       onChange={(e) => setProfileData(prev => ({ ...prev, specialty: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      placeholder="Ex: Psicologia Clinica, Terapia Cognitiva..."
+                      placeholder="Ex: Psicologia Clínica, Terapia Cognitiva..."
                     />
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Numero CRP
+                      Número CRP
                     </label>
                     <input
                       type="text"
@@ -361,7 +361,7 @@ export default function Settings() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Valor Padrao da Sessao (R$)
+                      Valor Padrão da Sessão (R$)
                     </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -443,11 +443,11 @@ export default function Settings() {
               
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Endereco</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Endereço</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Endereco
+                      Endereço
                     </label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
@@ -456,7 +456,7 @@ export default function Settings() {
                         value={profileData.address}
                         onChange={(e) => setProfileData(prev => ({ ...prev, address: e.target.value }))}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="Rua, numero, complemento..."
+                        placeholder="Rua, número, complemento..."
                       />
                     </div>
                   </div>

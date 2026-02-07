@@ -12,7 +12,7 @@ import {
 import { isFirebaseConfigured } from '../lib/firebase'
 
 const PERMISSION_LABELS: Record<NotificationPermission, string> = {
-  default: 'Nao definido',
+  default: 'Não definido',
   denied: 'Negado',
   granted: 'Concedido'
 }
@@ -59,12 +59,12 @@ export default function Notifications() {
 
     const loadStatus = async () => {
       if (!consentToken) {
-        setStatusMessage('Link de consentimento nao encontrado.')
+        setStatusMessage('Link de consentimento não encontrado.')
         return
       }
 
       if (supported === false) {
-        setStatusMessage(supportReason || 'Notificacoes nao suportadas neste dispositivo.')
+        setStatusMessage(supportReason || 'Notificações não suportadas neste dispositivo.')
         return
       }
 
@@ -78,11 +78,11 @@ export default function Notifications() {
         if (!active) return
         setSubscribed(status.isEnabled)
         setLastSeenAt(status.lastSeenAt)
-        setStatusMessage(status.isEnabled ? 'Lembretes ativados.' : 'Lembretes ainda nao ativados.')
+        setStatusMessage(status.isEnabled ? 'Lembretes ativados.' : 'Lembretes ainda não ativados.')
       } catch (error) {
         console.error('Erro ao verificar push:', error)
         if (!active) return
-        setStatusMessage('Nao foi possivel verificar a assinatura agora.')
+        setStatusMessage('Não foi possível verificar a assinatura agora.')
       } finally {
         if (active) setChecking(false)
       }
@@ -114,12 +114,12 @@ export default function Notifications() {
 
   const handleEnable = async () => {
     if (!consentToken) {
-      toast.error('Link de consentimento invalido.')
+      toast.error('Link de consentimento inválido.')
       return
     }
 
     if (!isFirebaseConfigured) {
-      toast.error('Firebase nao configurado neste portal.')
+      toast.error('Firebase não configurado neste portal.')
       return
     }
 
@@ -129,8 +129,8 @@ export default function Notifications() {
       setPermission(result)
 
       if (result !== 'granted') {
-        toast.error('Permissao de notificacao negada.')
-        setStatusMessage('Permissao negada. Ative nas configuracoes do navegador.')
+        toast.error('Permissão de notificação negada.')
+        setStatusMessage('Permissão negada. Ative nas configurações do navegador.')
         return
       }
 
@@ -150,7 +150,7 @@ export default function Notifications() {
 
   const handleDisable = async () => {
     if (!consentToken) {
-      toast.error('Link de consentimento invalido.')
+      toast.error('Link de consentimento inválido.')
       return
     }
 
@@ -172,7 +172,7 @@ export default function Notifications() {
     if (permission !== 'denied') return null
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        Para ativar, abra as configuracoes do navegador, permita notificacoes para este site e recarregue a pagina.
+        Para ativar, abra as configurações do navegador, permita notificações para este site e recarregue a página.
       </div>
     )
   }
@@ -184,14 +184,14 @@ export default function Notifications() {
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-gray-900">Lembretes de consulta</h1>
             <p className="text-gray-600">
-              Voce vai receber lembretes de consulta no navegador deste dispositivo. Voce pode desativar quando quiser.
+              Você vai receber lembretes de consulta no navegador deste dispositivo. Você pode desativar quando quiser.
             </p>
           </div>
 
           <div className="mt-6 space-y-4">
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
-                Permissao: {PERMISSION_LABELS[permission]}
+                Permissão: {PERMISSION_LABELS[permission]}
               </span>
               <span
                 className={`px-3 py-1 rounded-full ${
@@ -206,7 +206,7 @@ export default function Notifications() {
               </span>
               {lastSeenAt && (
                 <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
-                  Ultima atualizacao: {new Date(lastSeenAt).toLocaleString('pt-BR')}
+                  Última atualização: {new Date(lastSeenAt).toLocaleString('pt-BR')}
                 </span>
               )}
             </div>
@@ -220,7 +220,7 @@ export default function Notifications() {
             {renderPermissionHelp()}
 
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-              {checking ? 'Verificando sua inscricao...' : statusMessage}
+              {checking ? 'Verificando sua inscrição...' : statusMessage}
             </div>
           </div>
 
@@ -245,7 +245,7 @@ export default function Notifications() {
 
           <div className="mt-8 text-sm text-gray-500 space-y-2">
             <p>Se estiver usando outro navegador ou dispositivo, repita o processo neste dispositivo.</p>
-            <p>Ao ativar, voce concorda em receber lembretes relacionados apenas as suas consultas agendadas.</p>
+            <p>Ao ativar, você concorda em receber lembretes relacionados apenas às suas consultas agendadas.</p>
           </div>
         </div>
       </div>

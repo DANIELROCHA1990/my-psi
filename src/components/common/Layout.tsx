@@ -84,10 +84,10 @@ export default function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Pacientes', href: '/patients', icon: UserRound },
-    { name: 'Sessoes', href: '/sessions', icon: CalendarCheck2 },
+    { name: 'Sessões', href: '/sessions', icon: CalendarCheck2 },
     { name: 'Agenda', href: '/calendar', icon: CalendarClock },
     { name: 'Financeiro', href: '/financial', icon: Wallet },
-    { name: 'Configuracoes', href: '/settings', icon: SlidersHorizontal }
+    { name: 'Configurações', href: '/settings', icon: SlidersHorizontal }
   ]
 
   const displayName = profileName

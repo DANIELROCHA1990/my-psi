@@ -59,7 +59,7 @@ const supabaseUrl = rawSupabaseUrl ? normalizeSupabaseUrl(rawSupabaseUrl) : ''
 
 const callPublicSchedule = async (payload: Record<string, unknown>) => {
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase nao configurado')
+    throw new Error('Supabase não configurado')
   }
 
   const response = await fetch(`${supabaseUrl}/functions/v1/public-schedule`, {
@@ -172,7 +172,7 @@ export default function ScheduleLink() {
         setAvailabilitySessions(sessions)
       } catch (error: any) {
         console.error('Erro ao buscar disponibilidade:', error)
-        toast.error(error?.message || 'Erro ao carregar horarios')
+        toast.error(error?.message || 'Erro ao carregar horários')
         setAvailabilitySessions([])
       } finally {
         setLoadingAvailability(false)
@@ -237,7 +237,7 @@ export default function ScheduleLink() {
       return
     }
     if (!formData.emergency_contact.trim()) {
-      toast.error('Informe o contato de emergencia')
+      toast.error('Informe o contato de emergência')
       return
     }
 
@@ -250,11 +250,11 @@ export default function ScheduleLink() {
       return
     }
     if (!selectedTime) {
-      toast.error('Selecione um horario')
+      toast.error('Selecione um horário')
       return
     }
     if (!activeToken) {
-      toast.error('Link invalido')
+      toast.error('Link inválido')
       return
     }
 
@@ -284,9 +284,9 @@ export default function ScheduleLink() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-w-lg w-full text-center">
           <CalendarIcon className="h-10 w-10 text-emerald-600 mx-auto" />
-          <h1 className="text-xl font-semibold text-gray-900 mt-4">Link de agendamento invalido</h1>
+          <h1 className="text-xl font-semibold text-gray-900 mt-4">Link de agendamento inválido</h1>
           <p className="text-gray-600 mt-2">
-            Solicite um link valido ao profissional responsavel.
+            Solicite um link válido ao profissional responsável.
           </p>
         </div>
       </div>
@@ -300,7 +300,7 @@ export default function ScheduleLink() {
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900">Link de agendamento</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Compartilhe este link com seu paciente para ele preencher os dados e escolher o horario.
+              Compartilhe este link com seu paciente para ele preencher os dados e escolher o horário.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-3">
               <input
@@ -325,7 +325,7 @@ export default function ScheduleLink() {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-2xl font-semibold text-gray-900">Agendamento</h1>
-            <p className="text-sm text-gray-600 mt-1">Preencha os dados e escolha o melhor horario.</p>
+            <p className="text-sm text-gray-600 mt-1">Preencha os dados e escolha o melhor horário.</p>
           </div>
 
           {done ? (
@@ -333,7 +333,7 @@ export default function ScheduleLink() {
               <CheckCircle className="h-12 w-12 text-emerald-600 mx-auto" />
               <h2 className="text-xl font-semibold text-gray-900 mt-4">Agendamento enviado</h2>
               <p className="text-gray-600 mt-2">
-                Seu horario foi reservado. Aguarde a confirmacao do profissional.
+                Seu horário foi reservado. Aguarde a confirmação do profissional.
               </p>
             </div>
           ) : (
@@ -343,7 +343,7 @@ export default function ScheduleLink() {
                   1. Dados
                 </span>
                 <span className={`px-2 py-1 rounded-full ${step === 2 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100'}`}>
-                  2. Dia e horario
+                  2. Dia e horário
                 </span>
               </div>
 
@@ -395,7 +395,7 @@ export default function ScheduleLink() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contato de emergencia *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contato de emergência *</label>
                       <input
                         type="text"
                         value={formData.emergency_contact}
@@ -407,14 +407,14 @@ export default function ScheduleLink() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Frequencia das sessoes *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Frequência das sessões *</label>
                     <select
                       value={formData.session_frequency}
                       onChange={(e) => setFormData((prev) => ({ ...prev, session_frequency: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       <option value="weekly">Semanal</option>
-                      <option value="as_needed">Conforme necessario</option>
+                      <option value="as_needed">Conforme necessário</option>
                     </select>
                   </div>
 
@@ -445,9 +445,9 @@ export default function ScheduleLink() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Escolha o horario</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Escolha o horário</label>
                     {loadingAvailability ? (
-                      <p className="text-sm text-gray-500">Carregando horarios...</p>
+                      <p className="text-sm text-gray-500">Carregando horários...</p>
                     ) : selectedDate ? (
                       availableSlots.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -472,10 +472,10 @@ export default function ScheduleLink() {
                           })}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">Sem horarios disponiveis para este dia.</p>
+                        <p className="text-sm text-gray-500">Sem horários disponíveis para este dia.</p>
                       )
                     ) : (
-                      <p className="text-sm text-gray-500">Selecione um dia para ver os horarios.</p>
+                      <p className="text-sm text-gray-500">Selecione um dia para ver os horários.</p>
                     )}
                   </div>
 

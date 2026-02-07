@@ -6,12 +6,12 @@ import { addDays, addWeeks, parseISO, format } from 'date-fns'
 import { DEFAULT_SESSION_DURATION_MINUTES, findSessionConflict, getFirstAvailableSessionStart } from '../lib/scheduling'
 
 /**
- * ðŸ”§ UtilitÃírio: Converte um objeto Date (que Ã© sempre no fuso horÃírio local do ambiente)
+ * ðŸ”§ UtilitÃírio: Converte um objeto Date (que ? sempre no fuso horÃírio local do ambiente)
  * para uma string ISO 8601 em UTC (com o 'Z' no final).
  *
  * Exemplo:
- * Se o fuso horÃírio local Ã© UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
- * este mÃ©todo retornarÃí "2023-10-25T12:00:00.000Z".
+ * Se o fuso horÃírio local ? UTC-3 (Brasil) e 'date' representa 2023-10-25 09:00:00 local,
+ * este m?todo retornarÃí "2023-10-25T12:00:00.000Z".
  *
  * Isso garante que a data e hora agendadas localmente sejam corretamente
  * convertidas e armazenadas em um formato universal (UTC) no banco de dados.
@@ -107,7 +107,7 @@ const deriveSchedulesFromSessions = (sessions: Session[]): SessionSchedule[] => 
         time,
         paymentStatus: 'pending',
         sessionType: session.session_type || 'Sessao Individual',
-        durationMinutes: session.duration_minutes ?? 50,
+        durationMinutes: session.duration_minutes ?? DEFAULT_SESSION_DURATION_MINUTES,
         sessionPrice: session.session_price ?? undefined
       })
     }
@@ -167,8 +167,8 @@ const autoRenewSessionsIfNeeded = async (sessions: Session[]) => {
 
 export const sessionService = {
   /**
-   * Busca todas as sessÃµes do banco de dados, incluindo os dados do paciente associado.
-   * As sessÃµes sÃúo ordenadas pela data da sessão em ordem decrescente.
+   * Busca todas as sessões do banco de dados, incluindo os dados do paciente associado.
+   * As sessões sÃúo ordenadas pela data da sessão em ordem decrescente.
    * @returns Uma Promise que resolve para um array de objetos Session.
    * @throws Erro se a busca falhar.
    */
@@ -184,14 +184,14 @@ export const sessionService = {
   },
 
   /**
-   * Busca as prÃ³ximas sessÃµes (com data maior ou igual Ãá data atual).
-   * As sessÃµes sÃúo ordenadas pela data da sessão em ordem crescente.
-   * A comparaÃ§Ãúo Ã© feita em UTC para garantir consistÃªncia com o banco de dados.
+   * Busca as próximas sessões (com data maior ou igual Ãá data atual).
+   * As sessões sÃúo ordenadas pela data da sessão em ordem crescente.
+   * A comparaÃ§Ãúo ? feita em UTC para garantir consist?ncia com o banco de dados.
    * @returns Uma Promise que resolve para um array de objetos Session.
    * @throws Erro se a busca falhar.
    */
   async getUpcomingSessions(): Promise<Session[]> {
-    // ObtÃ©m a data e hora atual em UTC para comparaÃ§Ãúo consistente com o banco de dados.
+    // Obt?m a data e hora atual em UTC para comparaÃ§Ãúo consistente com o banco de dados.
     const now = new Date().toISOString();
     
     const { data, error } = await supabase
@@ -261,7 +261,7 @@ export const sessionService = {
       .single()
 
     if (error) {
-      // PGRST116 Ã© o cÃ³digo de erro para "nÃúo encontrado" no Supabase (PostgREST)
+      // PGRST116 ? o c?digo de erro para "nÃúo encontrado" no Supabase (PostgREST)
       if (error.code === 'PGRST116') {
         return null
       }
@@ -425,10 +425,10 @@ export const sessionService = {
   ): Promise<Session[]> {
     const sessions: any[] = []
     
-    // ObtÃ©m a data e hora atual no fuso horÃírio local do ambiente.
+    // Obt?m a data e hora atual no fuso horÃírio local do ambiente.
     const nowLocal = new Date();
 
-    // Buscar dados do paciente para pegar o preÃ§o da sessÃúo
+    // Buscar dados do paciente para pegar o pre?o da sessÃúo
     const { data: patient } = await supabase
       .from('patients')
       .select('session_price, session_frequency')
@@ -497,7 +497,7 @@ export const sessionService = {
           [...existingSessions, ...plannedSessions],
           candidateStart
         )
-        const conflictError = new Error(`Conflito de horario com sessao de ${conflictName}`)
+        const conflictError = new Error(`Conflito de horário com sessão de ${conflictName}`)
         ;(conflictError as any).code = 'SCHEDULE_CONFLICT'
         ;(conflictError as any).conflict = {
           patientName: conflictName,
@@ -644,10 +644,10 @@ export const sessionService = {
     return updatedSession
   },
   /**
-   * Substitui sessÃµes futuras (nÃúo pagas) de um paciente por novas sessÃµes automÃíticas.
+   * Substitui sessões futuras (nÃúo pagas) de um paciente por novas sessões automÃíticas.
    * @param patientId O ID do paciente.
    * @param schedules Um array de agendamentos recorrentes.
-   * @param weeksToCreate O nÃºmero de semanas para recriar sessÃµes.
+   * @param weeksToCreate O n?mero de semanas para recriar sessões.
    */
   async replaceFutureSessions(
     patientId: string,

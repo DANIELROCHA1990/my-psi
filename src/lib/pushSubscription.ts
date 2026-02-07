@@ -74,43 +74,43 @@ const toErrorMessage = (error: unknown) => {
   if (error && typeof error === 'object' && 'message' in error) {
     return String((error as { message?: unknown }).message)
   }
-  return 'Falha ao concluir a operacao.'
+  return 'Falha ao concluir a operação.'
 }
 
 export const getPushErrorMessage = (error: unknown) => {
   const message = toErrorMessage(error)
   if (message.toLowerCase().includes('invalid consent token')) {
-    return 'Link de consentimento invalido ou expirado.'
+    return 'Link de consentimento inválido ou expirado.'
   }
   if (message.toLowerCase().includes('token already linked')) {
-    return 'Este dispositivo ja foi vinculado a outro paciente.'
+    return 'Este dispositivo já foi vinculado a outro paciente.'
   }
   if (message.toLowerCase().includes('vapid')) {
-    return 'VAPID key nao configurada para este portal.'
+    return 'VAPID key não configurada para este portal.'
   }
   return message
 }
 
 export const getPushSupportStatus = async (): Promise<PushSupportStatus> => {
   if (typeof window === 'undefined') {
-    return { supported: false, reason: 'Ambiente nao suporta notificacoes.' }
+    return { supported: false, reason: 'Ambiente não suporta notificações.' }
   }
 
   if (!('Notification' in window)) {
-    return { supported: false, reason: 'Este navegador nao suporta notificacoes.' }
+    return { supported: false, reason: 'Este navegador não suporta notificações.' }
   }
 
   if (!('serviceWorker' in navigator)) {
-    return { supported: false, reason: 'Seu navegador nao suporta Service Worker.' }
+    return { supported: false, reason: 'Seu navegador não suporta Service Worker.' }
   }
 
   if (!isFirebaseConfigured) {
-    return { supported: false, reason: 'Firebase nao configurado.' }
+    return { supported: false, reason: 'Firebase não configurado.' }
   }
 
   const supported = await isSupported()
   if (!supported) {
-    return { supported: false, reason: 'Push nao suportado neste dispositivo.' }
+    return { supported: false, reason: 'Push não suportado neste dispositivo.' }
   }
 
   return { supported: true }
@@ -118,7 +118,7 @@ export const getPushSupportStatus = async (): Promise<PushSupportStatus> => {
 
 const ensureServiceWorker = async () => {
   if (!('serviceWorker' in navigator)) {
-    throw new Error('Service Worker nao suportado.')
+    throw new Error('Service Worker não suportado.')
   }
   return navigator.serviceWorker.register('/firebase-messaging-sw.js')
 }
@@ -130,12 +130,12 @@ export const registerPushToken = async (consentToken: string, meta?: Record<stri
 
   const messaging = await getMessagingInstance()
   if (!messaging) {
-    throw new Error('Push nao suportado ou Firebase nao configurado.')
+    throw new Error('Push não suportado ou Firebase não configurado.')
   }
 
   const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
   if (!vapidKey) {
-    throw new Error('VAPID key nao configurada.')
+    throw new Error('VAPID key não configurada.')
   }
 
   const registration = await ensureServiceWorker()
@@ -150,7 +150,7 @@ export const registerPushToken = async (consentToken: string, meta?: Record<stri
   }
 
   if (!token) {
-    throw new Error('Falha ao obter token de notificacao.')
+    throw new Error('Falha ao obter token de notificação.')
   }
 
   const { error } = await supabase.rpc('register_push_subscription', {

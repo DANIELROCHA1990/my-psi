@@ -88,7 +88,7 @@ export default function Dashboard() {
 
   const handleGenerateScheduleLink = async () => {
     if (!user) {
-      toast.error('Usuario nao autenticado')
+      toast.error('Usuário não autenticado')
       return
     }
 
@@ -180,7 +180,7 @@ export default function Dashboard() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Link de agendamento</h2>
               <p className="text-sm text-gray-600">
-                Compartilhe com o paciente para ele preencher os dados e reservar horario.
+                Compartilhe com o paciente para ele preencher os dados e reservar horário.
               </p>
             </div>
             <button

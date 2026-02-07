@@ -55,20 +55,20 @@ export default function Sessions() {
   }
   const handleCancelSession = async (session: Session) => {
     if (session.payment_status === 'cancelled') {
-      toast.error('Sessao ja esta cancelada')
+      toast.error('Sessão já está cancelada')
       return
     }
 
-    if (!confirm('Tem certeza que deseja cancelar esta sessao?')) return
+    if (!confirm('Tem certeza que deseja cancelar esta sessão?')) return
 
     try {
       const updatedSession = await sessionService.updateSession(session.id, {
         payment_status: 'cancelled'
       })
       handleSessionsUpdated([updatedSession])
-      toast.success('Sessao cancelada com sucesso')
+      toast.success('Sessão cancelada com sucesso')
     } catch (error) {
-      toast.error('Erro ao cancelar sessao')
+      toast.error('Erro ao cancelar sessão')
     }
   }
 
@@ -213,15 +213,15 @@ export default function Sessions() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sessoes</h1>
-          <p className="text-gray-600 mt-2">Gerencie suas sessoes de terapia.</p>
+          <h1 className="text-3xl font-bold text-gray-900">Sessões</h1>
+          <p className="text-gray-600 mt-2">Gerencie suas sessões de terapia.</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
           className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
         >
           <Plus className="h-5 w-5" />
-          Nova Sessao
+          Nova Sessão
         </button>
       </div>
 
@@ -233,7 +233,7 @@ export default function Sessions() {
               <Calendar className="h-6 w-6 text-emerald-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total de Sessoes</p>
+              <p className="text-sm font-medium text-gray-600">Total de Sessões</p>
               <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
             </div>
           </div>
@@ -245,7 +245,7 @@ export default function Sessions() {
               <Clock className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Proximas</p>
+              <p className="text-sm font-medium text-gray-600">Próximas</p>
               <p className="text-3xl font-bold text-gray-900">{stats.upcoming}</p>
             </div>
           </div>
@@ -296,7 +296,7 @@ export default function Sessions() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            Meses com sessoes ({filteredMonthGroups.length})
+            Meses com sessões ({filteredMonthGroups.length})
           </h2>
         </div>
 
@@ -317,7 +317,7 @@ export default function Sessions() {
                     <div>
                       <h3 className="text-lg font-medium text-gray-900 capitalize">{group.label}</h3>
                       <p className="text-sm text-gray-600">
-                        {group.totalSessions} sessoes - {group.patientsCount} pacientes
+                        {group.totalSessions} sessões - {group.patientsCount} pacientes
                       </p>
                     </div>
                   </div>
@@ -339,17 +339,17 @@ export default function Sessions() {
               <Calendar className="h-12 w-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchTerm ? 'Nenhum mes encontrado' : 'Nenhuma sessao agendada'}
+              {searchTerm ? 'Nenhum mês encontrado' : 'Nenhuma sessão agendada'}
             </h3>
             <p className="text-gray-600 mb-6">
-              {searchTerm ? 'Tente ajustar o termo de busca.' : 'Comece agendando sua primeira sessao.'}
+              {searchTerm ? 'Tente ajustar o termo de busca.' : 'Comece agendando sua primeira sessão.'}
             </p>
             {!searchTerm && (
               <button
                 onClick={() => setShowAddForm(true)}
                 className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
-                Agendar Primeira Sessao
+                Agendar Primeira Sessão
               </button>
             )}
           </div>
@@ -551,7 +551,7 @@ function MonthSessionsModal({
     event.preventDefault()
 
     if (!rescheduleTarget || !rescheduleDate) {
-      toast.error('Informe a nova data da sessao')
+      toast.error('Informe a nova data da sessão')
       return
     }
 
@@ -585,10 +585,10 @@ function MonthSessionsModal({
         rescheduleDate
       )
       onSessionsUpdated([updatedSession])
-      toast.success('Sessao remarcada com sucesso')
+      toast.success('Sessão remarcada com sucesso')
       handleRescheduleClose()
     } catch (error) {
-      toast.error('Erro ao remarcar sessao')
+      toast.error('Erro ao remarcar sessão')
     } finally {
       setRescheduleLoading(false)
     }
@@ -599,9 +599,9 @@ function MonthSessionsModal({
       <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Sessoes de {monthLabel}</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Sessões de {monthLabel}</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {monthTotals.totalSessions} sessoes - {monthTotals.paidCount} pagas - Total: R$ {monthTotals.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {monthTotals.totalSessions} sessões - {monthTotals.paidCount} pagas - Total: R$ {monthTotals.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
           <button
@@ -626,7 +626,7 @@ function MonthSessionsModal({
                     <div>
                       <h3 className="text-lg font-medium text-gray-900">{group.patientName}</h3>
                       <p className="text-sm text-gray-600">
-                        {group.sessions.length} sessoes - Total: R$ {group.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {group.sessions.length} sessões - Total: R$ {group.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div className="flex flex-col items-start md:items-end gap-2">
@@ -682,7 +682,7 @@ function MonthSessionsModal({
                               type="button"
                               onClick={() => onEditSession(session)}
                               className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              title="Editar sessao"
+                              title="Editar sessão"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
@@ -690,8 +690,8 @@ function MonthSessionsModal({
                               type="button"
                               onClick={() => handleRescheduleOpen(session)}
                               className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Remarcar sessao"
-                              aria-label="Remarcar sessao"
+                              title="Remarcar sessão"
+                              aria-label="Remarcar sessão"
                             >
                               <CalendarClock className="h-4 w-4" />
                             </button>
@@ -700,8 +700,8 @@ function MonthSessionsModal({
                               onClick={() => onCancelSession(session)}
                               disabled={session.payment_status === 'cancelled'}
                               className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60 disabled:hover:bg-transparent"
-                              title="Cancelar sessao"
-                              aria-label="Cancelar sessao"
+                              title="Cancelar sessão"
+                              aria-label="Cancelar sessão"
                             >
                               <XCircle className="h-4 w-4" />
                             </button>
@@ -714,7 +714,7 @@ function MonthSessionsModal({
               )
             })
           ) : (
-            <div className="text-center text-gray-600">Nenhuma sessao encontrada</div>
+            <div className="text-center text-gray-600">Nenhuma sessão encontrada</div>
           )}
         </div>
       </div>
@@ -724,7 +724,7 @@ function MonthSessionsModal({
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
-                Remarcar sessao
+                Remarcar sessão
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 {getPatientName(rescheduleTarget.patient_id, rescheduleTarget.patients?.full_name)}
@@ -874,15 +874,15 @@ function SessionModal({
 
       if (session) {
         await sessionService.updateSession(session.id, sessionData)
-        toast.success('Sessao atualizada com sucesso')
+        toast.success('Sessão atualizada com sucesso')
       } else {
         await sessionService.createSession(sessionData as any)
-        toast.success('Sessao criada com sucesso')
+        toast.success('Sessão criada com sucesso')
       }
 
       onSave()
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao salvar sessao')
+      toast.error(error.message || 'Erro ao salvar sessão')
     } finally {
       setLoading(false)
     }
@@ -893,14 +893,14 @@ function SessionModal({
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            {session ? 'Editar Sessao' : 'Nova Sessao'}
+            {session ? 'Editar Sessão' : 'Nova Sessão'}
           </h2>
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Basic Information */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informacoes Basicas</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -950,24 +950,24 @@ function SessionModal({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Sessao
+                  Tipo de Sessão
                 </label>
                 <select
                   value={formData.session_type}
                   onChange={(e) => setFormData(prev => ({ ...prev, session_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                  <option value="Sessao Individual">Sessao Individual</option>
-                  <option value="Sessao em Grupo">Sessao em Grupo</option>
-                  <option value="Sessao Familiar">Sessao Familiar</option>
-                  <option value="Avaliacao">Avaliacao</option>
+                  <option value="Sessao Individual">Sessão Individual</option>
+                  <option value="Sessao em Grupo">Sessão em Grupo</option>
+                  <option value="Sessao Familiar">Sessão Familiar</option>
+                  <option value="Avaliacao">Avaliação</option>
                   <option value="Retorno">Retorno</option>
                 </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valor da Sessao (R$) {selectedPatient && '(Valor fixo do paciente)'}
+                  Valor da Sessão (R$) {selectedPatient && '(Valor fixo do paciente)'}
                 </label>
                 <input
                   type="number"
@@ -999,24 +999,24 @@ function SessionModal({
           
           {/* Session Details */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Detalhes da Sessao</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Detalhes da Sessão</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Resumo da Sessao
+                  Resumo da Sessão
                 </label>
                 <textarea
                   rows={4}
                   value={formData.summary}
                   onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Resumo dos principais pontos abordados na sessao..."
+                  placeholder="Resumo dos principais pontos abordados na sessão..."
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Anotacoes da Sessao
+                  Anotações da Sessão
                 </label>
                 <textarea
                   rows={3}
@@ -1030,7 +1030,7 @@ function SessionModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Humor Antes da Sessao
+                    Humor Antes da Sessão
                   </label>
                   <input
                     type="text"
@@ -1043,7 +1043,7 @@ function SessionModal({
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Humor Apos a Sessao
+                    Humor Após a Sessão
                   </label>
                   <input
                     type="text"
@@ -1064,13 +1064,13 @@ function SessionModal({
                   value={formData.homework_assigned}
                   onChange={(e) => setFormData(prev => ({ ...prev, homework_assigned: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Exercicios ou tarefas para realizar ate a proxima sessao..."
+                  placeholder="Exercícios ou tarefas para realizar até a próxima sessão..."
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Proxima Sessao
+                  Próxima Sessão
                 </label>
                 <input
                   type="datetime-local"

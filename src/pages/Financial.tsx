@@ -189,7 +189,7 @@ export default function Financial() {
   })
 
   const chartYear = statsNow.getFullYear()
-  const monthlyTotals = Array.from({ length: 12 }, () => 0)
+  const monthlyPaidTotals = Array.from({ length: 12 }, () => 0)
   for (const record of records) {
     if (record.transaction_type !== 'income') {
       continue
@@ -198,26 +198,38 @@ export default function Financial() {
     if (recordDate.getFullYear() !== chartYear) {
       continue
     }
-    monthlyTotals[recordDate.getMonth()] += Number(record.amount)
+    monthlyPaidTotals[recordDate.getMonth()] += Number(record.amount)
   }
 
-  const chartData = monthlyTotals.map((value, index) => {
+  const monthlyPendingTotals = Array.from({ length: 12 }, () => 0)
+  for (const session of summaryRevenueSessions) {
+    if (session.payment_status !== 'pending') {
+      continue
+    }
+    const sessionDate = parseISO(session.session_date)
+    if (sessionDate.getFullYear() !== chartYear) {
+      continue
+    }
+    monthlyPendingTotals[sessionDate.getMonth()] += Number(session.session_price || 0)
+  }
+
+  const chartData = monthlyPaidTotals.map((value, index) => {
     const monthLabel = format(new Date(chartYear, index, 1), 'MMM', { locale: ptBR }).replace('.', '')
     const month = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-    return { month, receita: value }
+    return { month, pendente: monthlyPendingTotals[index], pago: value }
   })
 
   const currentMonthIndex = statsNow.getMonth()
   const previousMonthIndex = currentMonthIndex - 1
-  const currentMonthValue = monthlyTotals[currentMonthIndex] || 0
-  const previousMonthValue = previousMonthIndex >= 0 ? monthlyTotals[previousMonthIndex] || 0 : null
+  const currentMonthValue = monthlyPaidTotals[currentMonthIndex] || 0
+  const previousMonthValue = previousMonthIndex >= 0 ? monthlyPaidTotals[previousMonthIndex] || 0 : null
   const trendInfo = (() => {
     if (previousMonthValue === null) {
       return { direction: 'neutral' as const, label: 'Sem comparativo para janeiro.' }
     }
     const diff = currentMonthValue - previousMonthValue
     if (diff === 0) {
-      return { direction: 'neutral' as const, label: 'Estavel em relacao ao mes anterior.' }
+      return { direction: 'neutral' as const, label: 'Estável em relação ao mês anterior.' }
     }
     const direction = diff > 0 ? 'up' : 'down'
     if (previousMonthValue > 0) {
@@ -225,21 +237,21 @@ export default function Financial() {
       const verb = diff > 0 ? 'Crescimento' : 'Queda'
       return {
         direction,
-        label: `${verb} de ${percent.toFixed(1)}% em relacao ao mes anterior.`
+        label: `${verb} de ${percent.toFixed(1)}% em relação ao mês anterior.`
       }
     }
     const verb = diff > 0 ? 'Crescimento' : 'Queda'
     return {
       direction,
-      label: `${verb} sem base no mes anterior.`
+        label: `${verb} sem base no mês anterior.`
     }
   })()
 
   const paymentMethodLabels: Record<string, string> = {
     cash: 'Dinheiro',
-    credit_card: 'Cartao de credito',
-    debit_card: 'Cartao de debito',
-    bank_transfer: 'Transferencia',
+    credit_card: 'Cartão de crédito',
+    debit_card: 'Cartão de débito',
+    bank_transfer: 'Transferência',
     pix: 'PIX'
   }
 
@@ -272,7 +284,7 @@ export default function Financial() {
     weekly: 'Semanal',
     biweekly: 'Quinzenal',
     monthly: 'Mensal',
-    as_needed: 'Conforme necessario'
+    as_needed: 'Conforme necessário'
   }
 
   const patientFrequencyMap = new Map(patients.map((patient) => [patient.id, patient.session_frequency]))
@@ -284,7 +296,7 @@ export default function Financial() {
   }, {} as Record<string, number>)
 
   const frequencyChartData = Object.entries(frequencyTotals).map(([frequency, value]) => ({
-    name: frequencyLabels[frequency] || 'Sem frequencia',
+    name: frequencyLabels[frequency] || 'Sem frequência',
     value
   }))
 
@@ -385,25 +397,25 @@ export default function Financial() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Periodo
+                Período
               </label>
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value as any)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               >
-                <option value="month">Mes atual</option>
-                <option value="quarter">Ultimos 3 meses</option>
-                <option value="next_quarter">Proximos 3 meses</option>
-                <option value="year">Ultimos 12 meses</option>
-                <option value="next_year">Proximos 12 meses</option>
-                <option value="all">Todo o periodo</option>
+                <option value="month">Mês atual</option>
+                <option value="quarter">Últimos 3 meses</option>
+                <option value="next_quarter">Próximos 3 meses</option>
+                <option value="year">Últimos 12 meses</option>
+                <option value="next_year">Próximos 12 meses</option>
+                <option value="all">Todo o período</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status de pagamento (sessao)
+                Status de pagamento (sessão)
               </label>
               <select
                 value={sessionStatusFilter}
@@ -424,26 +436,26 @@ export default function Financial() {
               onClick={() => applyQuickFilter('revenue')}
               className="px-3 py-1.5 text-sm bg-emerald-50 text-emerald-700 rounded-full hover:bg-emerald-100"
             >
-              Receitas do mes
+              Receitas do mês
             </button>
             <button
               type="button"
               onClick={() => applyQuickFilter('pending')}
               className="px-3 py-1.5 text-sm bg-yellow-50 text-yellow-700 rounded-full hover:bg-yellow-100"
             >
-              Pendentes do mes
+              Pendentes do mês
             </button>
             <button
               type="button"
               onClick={() => applyQuickFilter('quarter')}
               className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
             >
-              Ultimos 3 meses
+              Últimos 3 meses
             </button>
           </div>
 
           <p className="text-sm text-gray-500">
-            Sugestoes: combine periodo + status da sessao para comparar receita esperada e recebida.
+            Sugestões: combine período + status da sessão para comparar receita esperada e recebida.
           </p>
         </div>
       </div>
@@ -452,11 +464,11 @@ export default function Financial() {
       <div className="grid grid-cols-1 gap-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Receitas (jan a dez)</h3>
-          {chartData.every((item) => item.receita === 0) ? (
+          {chartData.every((item) => item.pendente === 0 && item.pago === 0) ? (
             <p className="text-sm text-gray-500">Sem dados para o ano atual.</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
+              <BarChart data={chartData} barCategoryGap="20%" barGap={6}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis
                   dataKey="month"
@@ -470,7 +482,8 @@ export default function Financial() {
                   tickLine={{ stroke: 'var(--chart-grid)' }}
                 />
                 <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                <Bar dataKey="receita" fill="#10b981" name="Receitas" />
+                <Bar dataKey="pendente" fill="#f59e0b" name="Pendente" />
+                <Bar dataKey="pago" fill="#10b981" name="Pago" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -495,7 +508,7 @@ export default function Financial() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Status de pagamento (valor)</h3>
           {paymentStatusChartData.length === 0 ? (
-            <p className="text-sm text-gray-500">Sem dados de sessao para o periodo.</p>
+            <p className="text-sm text-gray-500">Sem dados de sessão para o período.</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -534,10 +547,10 @@ export default function Financial() {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">
-            Receita por frequencia (status: {revenueStatusLabel})
+            Receita por frequência (status: {revenueStatusLabel})
           </h3>
           {frequencyChartData.length === 0 ? (
-            <p className="text-sm text-gray-500">Sem sessoes com valor para o periodo.</p>
+            <p className="text-sm text-gray-500">Sem sessões com valor para o período.</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={frequencyChartData}>
@@ -563,16 +576,16 @@ export default function Financial() {
 
       <div className="grid grid-cols-1 gap-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Dicas de analise</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Dicas de análise</h3>
           <div className="space-y-4 text-sm text-gray-600">
             <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
               Use o filtro de status para comparar receita recebida vs pendente.
             </div>
             <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-              Combine periodo + status da sessao para acompanhar valores pendentes.
+              Combine período + status da sessão para acompanhar valores pendentes.
             </div>
             <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-              Ajuste a frequencia para ver impacto direto no faturamento esperado.
+              Ajuste a frequência para ver impacto direto no faturamento esperado.
             </div>
           </div>
         </div>

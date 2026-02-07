@@ -57,7 +57,7 @@ export default function App() {
       return
     }
     if (newPassword !== confirmPassword) {
-      toast.error('As senhas nao conferem.')
+      toast.error('As senhas não conferem.')
       return
     }
 
@@ -124,7 +124,7 @@ export default function App() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">Alterar senha</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Por seguranca, defina uma nova senha para continuar.
+                Por segurança, defina uma nova senha para continuar.
               </p>
             </div>
             <form onSubmit={handleForcePasswordSubmit} className="p-6 space-y-4">

@@ -35,28 +35,28 @@ type AgendaPushResult = {
 
 function formatSessionTypeLabel(value?: string): string {
   if (!value) {
-    return 'Sessao'
+    return 'Sessão'
   }
 
   const normalized = normalizeSearchText(value)
 
   if (normalized.includes('individual')) {
-    return 'Sessao Individual'
+    return 'Sessão Individual'
   }
   if (normalized.includes('grupo')) {
-    return 'Sessao em Grupo'
+    return 'Sessão em Grupo'
   }
   if (normalized.includes('familiar')) {
-    return 'Sessao Familiar'
+    return 'Sessão Familiar'
   }
   if (normalized.includes('avaliacao')) {
-    return 'Avaliacao'
+    return 'Avaliação'
   }
   if (normalized.includes('retorno')) {
     return 'Retorno'
   }
   if (normalized.includes('sess')) {
-    return 'Sessao'
+    return 'Sessão'
   }
 
   return value
@@ -135,7 +135,7 @@ function SessionEditModal({
 
     const candidateStart = parseISO(formData.session_date)
     if (Number.isNaN(candidateStart.getTime())) {
-      toast.error('Data invalida')
+      toast.error('Data inválida')
       return
     }
 
@@ -174,10 +174,10 @@ function SessionEditModal({
 
       const updatedSession = await sessionService.updateSession(session.id, updates)
       onSaved(updatedSession)
-      toast.success('Sessao atualizada')
+      toast.success('Sessão atualizada')
       onClose()
     } catch (error) {
-      toast.error('Erro ao atualizar sessao')
+      toast.error('Erro ao atualizar sessão')
     } finally {
       setSaving(false)
     }
@@ -185,11 +185,11 @@ function SessionEditModal({
 
   const handleCancelSession = async () => {
     if (session.payment_status === 'cancelled') {
-      toast.error('Sessao ja esta cancelada')
+      toast.error('Sessão já está cancelada')
       return
     }
 
-    if (!confirm('Tem certeza que deseja cancelar esta sessao?')) {
+    if (!confirm('Tem certeza que deseja cancelar esta sessão?')) {
       return
     }
 
@@ -200,10 +200,10 @@ function SessionEditModal({
         payment_status: 'cancelled'
       })
       onSaved(updatedSession)
-      toast.success('Sessao cancelada')
+      toast.success('Sessão cancelada')
       onClose()
     } catch (error) {
-      toast.error('Erro ao cancelar sessao')
+      toast.error('Erro ao cancelar sessão')
     } finally {
       setSaving(false)
     }
@@ -214,7 +214,7 @@ function SessionEditModal({
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Editar sessao</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Editar sessão</h2>
           <p className="text-sm text-gray-600 mt-1">{session.patients?.full_name}</p>
         </div>
 
@@ -235,7 +235,7 @@ function SessionEditModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Duracao (minutos)
+                Duração (minutos)
               </label>
               <input
                 type="number"
@@ -244,22 +244,22 @@ function SessionEditModal({
                 disabled
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
               />
-              <p className="text-xs text-gray-500 mt-1">Duracao fixa de 50 minutos.</p>
+              <p className="text-xs text-gray-500 mt-1">Duração fixa de 50 minutos.</p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de sessao
+                Tipo de sessão
               </label>
               <select
                 value={formData.session_type}
                 onChange={(event) => setFormData(prev => ({ ...prev, session_type: event.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               >
-                <option value="Sessao Individual">Sessao Individual</option>
-                <option value="Sessao em Grupo">Sessao em Grupo</option>
-                <option value="Sessao Familiar">Sessao Familiar</option>
-                <option value="Avaliacao">Avaliacao</option>
+                <option value="Sessao Individual">Sessão Individual</option>
+                <option value="Sessao em Grupo">Sessão em Grupo</option>
+                <option value="Sessao Familiar">Sessão Familiar</option>
+                <option value="Avaliacao">Avaliação</option>
                 <option value="Retorno">Retorno</option>
               </select>
             </div>
@@ -303,7 +303,7 @@ function SessionEditModal({
               value={formData.summary}
               onChange={(event) => setFormData(prev => ({ ...prev, summary: event.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              placeholder="Resumo da sessao"
+              placeholder="Resumo da sessão"
             />
           </div>
 
@@ -314,7 +314,7 @@ function SessionEditModal({
               disabled={saving}
               className="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-60"
             >
-              Cancelar sessao
+              Cancelar sessão
             </button>
             <div className="flex justify-end gap-3">
               <button
@@ -447,13 +447,13 @@ export default function Calendar() {
 
     const selectedAgendaDate = parseISO(agendaEmailDate)
     if (Number.isNaN(selectedAgendaDate.getTime())) {
-      toast.error('Data invalida')
+      toast.error('Data inválida')
       return
     }
 
     const accessToken = await getFreshAccessToken()
     if (!accessToken) {
-      toast.error('Sessao expirada. Faça login novamente.')
+      toast.error('Sessão expirada. Faça login novamente.')
       return
     }
 
@@ -486,13 +486,13 @@ export default function Calendar() {
 
     const selectedAgendaDate = parseISO(agendaPushDate)
     if (Number.isNaN(selectedAgendaDate.getTime())) {
-      toast.error('Data invalida')
+      toast.error('Data inválida')
       return
     }
 
     const accessToken = await getFreshAccessToken()
     if (!accessToken) {
-      toast.error('Sessao expirada. Faça login novamente.')
+      toast.error('Sessão expirada. Faça login novamente.')
       return
     }
 
@@ -515,13 +515,13 @@ export default function Calendar() {
           sent: result.sent ?? 0,
           inactivePatients: result.inactivePatients ?? []
         })
-        toast.success('Notificacoes preparadas')
+        toast.success('Notificações preparadas')
       } else {
-        toast.error('Falha ao preparar notificacoes')
+        toast.error('Falha ao preparar notificações')
       }
     } catch (error) {
       console.error('Erro ao enviar push:', error)
-      toast.error('Falha ao preparar notificacoes')
+      toast.error('Falha ao preparar notificações')
     } finally {
       setSendingAgendaPush(false)
     }
@@ -693,7 +693,7 @@ export default function Calendar() {
                                 key={session.id}
                                 className="h-2 w-2 rounded-full"
                                 style={{ backgroundColor: patientColor || fallbackColor }}
-                                aria-label="Sessao agendada"
+                                aria-label="Sessão agendada"
                               />
                             )
                           })}
@@ -769,7 +769,7 @@ export default function Calendar() {
                               type="button"
                               onClick={() => setEditingSession(session)}
                               className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              title="Editar sessao"
+                              title="Editar sessão"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
@@ -845,7 +845,7 @@ export default function Calendar() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">Preparar agenda (Push)</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Envie notificacoes para pacientes com consultas na data escolhida.
+                Envie notificações para pacientes com consultas na data escolhida.
               </p>
             </div>
             <div className="p-6 space-y-4">
@@ -862,7 +862,7 @@ export default function Calendar() {
               </div>
               {agendaPushDate && (
                 <div className="text-sm text-gray-600">
-                  {getSessionsForDate(parseISO(agendaPushDate)).length} sessoes encontradas para esta data.
+                  {getSessionsForDate(parseISO(agendaPushDate)).length} sessões encontradas para esta data.
                 </div>
               )}
               {agendaPushResult && (
@@ -873,7 +873,7 @@ export default function Calendar() {
                     <div className="pt-2 space-y-1 text-emerald-800">
                       {agendaPushResult.inactivePatients.map((name, index) => (
                         <div key={`${name}-${index}`}>
-                          o paciente {name} nao esta com as notificacoes ativas
+                          o paciente {name} não está com as notificações ativas
                         </div>
                       ))}
                     </div>

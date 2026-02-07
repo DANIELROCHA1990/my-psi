@@ -17,7 +17,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const formatDateLabel = (dateString: string) => {
-  if (!dateString) return 'Data nao informada'
+  if (!dateString) return 'Data não informada'
   const parsed = parseISO(dateString)
   if (Number.isNaN(parsed.getTime())) {
     return dateString
@@ -40,7 +40,7 @@ export default function PushAgendaPreview() {
       time: searchParams.get('time') || '',
       duration: searchParams.get('duration') || '50',
       status: searchParams.get('status') || 'pending',
-      type: searchParams.get('type') || 'Sessao Individual',
+      type: searchParams.get('type') || 'Sessão Individual',
       price: searchParams.get('price') || '',
       patient: searchParams.get('patient') || 'Paciente'
     }

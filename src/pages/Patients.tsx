@@ -122,7 +122,7 @@ export default function Patients() {
 
       const token = Array.isArray(data) ? data[0] : data
       if (!token || typeof token !== 'string') {
-        throw new Error('Token nao retornado.')
+        throw new Error('Token não retornado.')
       }
 
       const origin = typeof window !== 'undefined' ? window.location.origin : ''
@@ -160,18 +160,18 @@ export default function Patients() {
   const contractDaysOfWeek = [
     { value: 0, label: 'Domingo' },
     { value: 1, label: 'Segunda-feira' },
-    { value: 2, label: 'Terca-feira' },
+    { value: 2, label: 'Terça-feira' },
     { value: 3, label: 'Quarta-feira' },
     { value: 4, label: 'Quinta-feira' },
     { value: 5, label: 'Sexta-feira' },
-    { value: 6, label: 'Sabado' }
+    { value: 6, label: 'Sábado' }
   ]
 
   const frequencyLabels: Record<string, string> = {
     weekly: 'Semanal',
     biweekly: 'Quinzenal',
     monthly: 'Mensal',
-    as_needed: 'Conforme necessario'
+    as_needed: 'Conforme necessário'
   }
 
   const paymentStatusLabels: Record<string, string> = {
@@ -181,23 +181,23 @@ export default function Patients() {
   }
 
   const contractClauses = [
-    '1. O processo de psicoterapia iniciara a partir da autorizacao de um(a) dos(as) responsaveis da crianca ou adolescente. O processo se dara em medio a longo prazo. Afirma-se o sigilo profissional dos atendimentos, no qual nao ha violacao dos dados, ou seja, informacoes obtidas nos atendimentos com o(a) paciente para outrem (Com excecao em casos do(a) paciente colocar a propria vida em risco ou de outrem).',
-    '2. O processo deve ser iniciado a partir da entrevista com pais e/ou responsaveis da crianca ou adolescente, recolhendo as principais informacoes e os motivos para iniciar o processo. As entrevistas com os pais e/ou responsaveis deve ser realizada de forma periodica a medida que a profissional sinta necessidade, ou ainda que os proprios responsaveis do(a) paciente solicitem.',
-    '2.1. O atendimento com os responsaveis do(a) adolescente acontecera mediante aos acordos feitos entre paciente e a profissional, caso lhe for pertinente.',
-    '3. Os atendimentos terao frequencia de, no minimo, uma vez por semana, em horario e dia preestabelecidos por todas as partes. Podendo passar por alteracoes e/ou aumento de sessoes semanais, caso haja necessidade clinica.',
-    '4. O valor das sessoes sera definido pela profissional, mas podera passar por alteracoes no decorrer do processo a medida que as partes sintam a necessidade de modificar.',
-    '5. O valor da sessao sofrera reajuste anual de 10%, acordado em contrato com o(s) responsavel(eis), acontecendo no inicio de cada ano ou a cada ano de acompanhamento.',
-    '6. O pagamento das sessoes e definido pela profissional, sendo tambem um combinado entre as partes, podendo sofrer ou nao alteracao, como informado no item 3 e 4.',
-    '7. As faltas, os atrasos e as interrupcoes do processo devem ser avisadas com antecedencia a profissional, para que nao prejudique o processo do(a) paciente. E possivel que, diante das dificuldades de permanencia, seja necessario encaminhar o(a) paciente para outro(a) profissional.',
-    '8. A profissional avisara com antecedencia em caso de faltas ou atrasos. Assim, disponibilizando-se para a reposicao dos atendimentos e das horas, sem onus da sessao de reposicao.',
-    '9. Faltas serao cobradas, com ou sem aviso previo, faltas informadas antes de 24 horas poderao realizar reposicao sem custo adicional, caso seja avisado dentro das 24h da sessao, a sessao de reposicao sera cobrada como sessao extra.',
-    '10. A profissional avisara com antecedencia quando lhe couber tirar ferias ou recesso, tendo, portanto, breve interrupcao dos atendimentos/pagamentos. As ferias podem ocorrer uma ou duas vezes ao ano, no mes de julho e/ou no mes de dezembro (recesso das festas e dos feriados de final de ano). No entanto, podem ocorrer modificacoes caso o processo possa sofrer prejuizos com a interrupcao ocasionada por ferias ou recesso. As sessoes que nao ocorrerem devido as ferias da profissional nao serao cobradas.',
-    '11. Em caso de ferias escolares, as sessoes nao sofrem mudanca, sendo estas permanecendo em seu horario reservado preservado, com os mesmos combinados em contrato.',
-    '12. E de suma importancia a presenca semanal do(a) paciente nas sessoes, sendo repensada a continuidade caso haja pelo menos tres faltas consecutivas. Logo, as entrevistas periodicas com os pais tambem sao realizadas pelo menos a cada seis a oito sessoes com a crianca ou o adolescente. Essa periodicidade semanal dos atendimentos com o(a) paciente pode ser repensada, bem como as periodicidades dos atendimentos com a familia.',
-    '13. Os atendimentos duram em torno de, no minimo, 45 minutos. Em caso de atrasos do(a) paciente, o tempo nao sera alterado, sendo utilizado o tempo restante da sessao. Em caso de a profissional atrasar, o tempo do paciente nao e prejudicado, sendo reposto na mesma sessao ou em outras, seguintes.',
-    '14. Em caso de interrupcao do processo, e relevante que sejam realizadas sessoes para facilitar o processo de desligamento da crianca ou adolescente, como tambem a realizacao de pelo menos uma sessao com os pais e/ou responsaveis.',
-    '15. Em caso de necessidade de outros acompanhamentos, a profissional podera realizar encaminhamentos para outros especialistas com o intuito de complementar e ampliar o cuidado do(a) paciente, bem como encaminhamentos direcionados aos membros da familia do(a) paciente.',
-    '16. A profissional podera ficar autorizada a realizar visitas escolares e/ou contato com outros profissionais que o(a) acompanham, rede de apoio ou membros que fazem parte do ciclo de relacoes da crianca ou adolescente.'
+    '1. O processo de psicoterapia iniciará a partir da autorização de um(a) dos(as) responsáveis da criança ou adolescente. O processo se dará em médio a longo prazo. Afirma-se o sigilo profissional dos atendimentos, no qual não há violação dos dados, ou seja, informações obtidas nos atendimentos com o(a) paciente para outrem (Com exceção em casos do(a) paciente colocar a própria vida em risco ou de outrem).',
+    '2. O processo deve ser iniciado a partir da entrevista com pais e/ou responsáveis da criança ou adolescente, recolhendo as principais informações e os motivos para iniciar o processo. As entrevistas com os pais e/ou responsáveis devem ser realizadas de forma periódica à medida que a profissional sinta necessidade, ou ainda que os próprios responsáveis do(a) paciente solicitem.',
+    '2.1. O atendimento com os responsáveis do(a) adolescente acontecerá mediante aos acordos feitos entre paciente e a profissional, caso lhe for pertinente.',
+    '3. Os atendimentos terão frequência de, no mínimo, uma vez por semana, em horário e dia preestabelecidos por todas as partes. Podendo passar por alterações e/ou aumento de sessões semanais, caso haja necessidade clínica.',
+    '4. O valor das sessões será definido pela profissional, mas poderá passar por alterações no decorrer do processo à medida que as partes sintam a necessidade de modificar.',
+    '5. O valor da sessão sofrerá reajuste anual de 10%, acordado em contrato com o(s) responsável(eis), acontecendo no início de cada ano ou a cada ano de acompanhamento.',
+    '6. O pagamento das sessões é definido pela profissional, sendo também um combinado entre as partes, podendo sofrer ou não alteração, como informado no item 3 e 4.',
+    '7. As faltas, os atrasos e as interrupções do processo devem ser avisadas com antecedência à profissional, para que não prejudique o processo do(a) paciente. É possível que, diante das dificuldades de permanência, seja necessário encaminhar o(a) paciente para outro(a) profissional.',
+    '8. A profissional avisará com antecedência em caso de faltas ou atrasos. Assim, disponibilizando-se para a reposição dos atendimentos e das horas, sem ônus da sessão de reposição.',
+    '9. Faltas serão cobradas, com ou sem aviso prévio; faltas informadas antes de 24 horas poderão realizar reposição sem custo adicional, caso seja avisado dentro das 24h da sessão, a sessão de reposição será cobrada como sessão extra.',
+    '10. A profissional avisará com antecedência quando lhe couber tirar férias ou recesso, tendo, portanto, breve interrupção dos atendimentos/pagamentos. As férias podem ocorrer uma ou duas vezes ao ano, no mês de julho e/ou no mês de dezembro (recesso das festas e dos feriados de final de ano). No entanto, podem ocorrer modificações caso o processo possa sofrer prejuízos com a interrupção ocasionada por férias ou recesso. As sessões que não ocorrerem devido às férias da profissional não serão cobradas.',
+    '11. Em caso de férias escolares, as sessões não sofrem mudança, sendo estas permanecendo em seu horário reservado preservado, com os mesmos combinados em contrato.',
+    '12. É de suma importância a presença semanal do(a) paciente nas sessões, sendo repensada a continuidade caso haja pelo menos três faltas consecutivas. Logo, as entrevistas periódicas com os pais também são realizadas pelo menos a cada seis a oito sessões com a criança ou o adolescente. Essa periodicidade semanal dos atendimentos com o(a) paciente pode ser repensada, bem como as periodicidades dos atendimentos com a família.',
+    '13. Os atendimentos duram em torno de, no mínimo, 45 minutos. Em caso de atrasos do(a) paciente, o tempo não será alterado, sendo utilizado o tempo restante da sessão. Em caso de a profissional atrasar, o tempo do paciente não é prejudicado, sendo reposto na mesma sessão ou em outras, seguintes.',
+    '14. Em caso de interrupção do processo, é relevante que sejam realizadas sessões para facilitar o processo de desligamento da criança ou adolescente, como também a realização de pelo menos uma sessão com os pais e/ou responsáveis.',
+    '15. Em caso de necessidade de outros acompanhamentos, a profissional poderá realizar encaminhamentos para outros especialistas com o intuito de complementar e ampliar o cuidado do(a) paciente, bem como encaminhamentos direcionados aos membros da família do(a) paciente.',
+    '16. A profissional poderá ficar autorizada a realizar visitas escolares e/ou contato com outros profissionais que o(a) acompanham, rede de apoio ou membros que fazem parte do ciclo de relações da criança ou adolescente.',
   ]
 
   const formatBirthDate = (value?: string) => {
@@ -387,16 +387,16 @@ export default function Patients() {
       patient.email ? `Email: ${patient.email}` : null,
       patient.phone ? `Telefone: ${patient.phone}` : null,
       formatBirthDate(patient.birth_date) ? `Data de nascimento: ${formatBirthDate(patient.birth_date)}` : null,
-      addressLineParts.length ? `Endereco: ${addressLineParts.join(', ')}` : null
+      addressLineParts.length ? `Endereço: ${addressLineParts.join(', ')}` : null
     ].filter(Boolean) as string[]
 
     patientInfoLines.forEach((line) => addWrappedLines(line))
     cursorY += sectionGap
 
     addSectionTitle('FREQUENCIA DAS SESSOES')
-    addWrappedLines(`Frequencia: ${frequencyLabels[patient.session_frequency] || patient.session_frequency}`)
+    addWrappedLines(`Frequência: ${frequencyLabels[patient.session_frequency] || patient.session_frequency}`)
     if (patient.session_price !== null && patient.session_price !== undefined) {
-      addWrappedLines(`Valor da sessao: R$ ${Number(patient.session_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+      addWrappedLines(`Valor da sessão: R$ ${Number(patient.session_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
     }
     cursorY += sectionGap
 
@@ -1113,9 +1113,9 @@ function PatientModal({
         } else if (deactivatingPatient) {
           const { error: deactivateError } = await patientService.deactivatePatient(patient.id)
           if (deactivateError) {
-            toast.error('Paciente atualizado, mas erro ao apagar sessoes futuras')
+            toast.error('Paciente atualizado, mas erro ao apagar sessões futuras')
           } else {
-            toast.success('Paciente inativado e sessoes futuras removidas')
+            toast.success('Paciente inativado e sessões futuras removidas')
           }
         } else if (manageAutoSessions && sessionSchedules.length > 0 && (schedulesChanged || frequencyChanged)) {
           try {
@@ -1539,9 +1539,9 @@ function PatientModal({
               <div className="md:col-span-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-900">Renovacao automatica</h4>
+                    <h4 className="text-sm font-medium text-gray-900">Renovação automática</h4>
                     <p className="text-sm text-gray-600">
-                      Ao finalizar todas as sessoes, novas sessoes serao criadas com o mesmo padrao.
+                      Ao finalizar todas as sessões, novas sessões serao criadas com o mesmo padrao.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
