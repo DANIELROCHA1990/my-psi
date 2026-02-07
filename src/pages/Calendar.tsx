@@ -92,6 +92,14 @@ function isValidHexColor(value: string): boolean {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(value)
 }
 
+function sortSessionsByTime(list: Session[]): Session[] {
+  return [...list].sort((a, b) => {
+    const timeA = parseUTC(a.session_date).getTime()
+    const timeB = parseUTC(b.session_date).getTime()
+    return timeA - timeB
+  })
+}
+
 function SessionEditModal({
   session,
   allSessions,
@@ -526,7 +534,7 @@ export default function Calendar() {
   const monthDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd }) // Array de objetos Date locais (meia-noite)
 
   const getSessionsForDate = (date: Date) => { // 'date' é um objeto Date local (meia-noite)
-    return sessions.filter(session => {
+    const daySessions = sessions.filter(session => {
       const sessionDateUTC = parseUTC(session.session_date) // sessionDateUTC é um objeto Date que representa a data/hora em UTC
       
       // Para comparar se a sessão cai no 'date' local, precisamos converter sessionDateUTC para o fuso horário local
@@ -536,13 +544,15 @@ export default function Calendar() {
       // isSameDay() funcionará corretamente.
       return isSameDay(sessionDateUTC, date) && session.payment_status !== 'cancelled'
     })
+    return sortSessionsByTime(daySessions)
   }
 
   const getSessionsForDateFromList = (list: Session[], date: Date) => {
-    return list.filter(session => {
+    const daySessions = list.filter(session => {
       const sessionDateUTC = parseUTC(session.session_date)
       return isSameDay(sessionDateUTC, date) && session.payment_status !== 'cancelled'
     })
+    return sortSessionsByTime(daySessions)
   }
 
   const handleDateClick = (date: Date) => {

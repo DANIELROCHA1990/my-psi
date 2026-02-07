@@ -204,8 +204,8 @@ export default function Dashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
           <div className="flex items-center gap-2">
             <div className="bg-emerald-50 p-2 rounded-lg">
               <Users className="h-5 w-5 text-emerald-600" />
@@ -217,7 +217,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
           <div className="flex items-center gap-2">
             <div className="bg-green-50 p-2 rounded-lg">
               <Calendar className="h-5 w-5 text-blue-600" />
@@ -229,7 +229,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
           <div className="flex items-center gap-2">
             <div className="bg-yellow-50 p-2 rounded-lg">
               <DollarSign className="h-5 w-5 text-yellow-600" />
@@ -243,7 +243,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
           <div className="flex items-center gap-2">
             <div className="bg-purple-50 p-2 rounded-lg">
               <TrendingUp className="h-5 w-5 text-purple-600" />
@@ -257,7 +257,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-w-0">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
           <div className="flex items-center gap-2">
             <div className="bg-yellow-50 p-2 rounded-lg">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
