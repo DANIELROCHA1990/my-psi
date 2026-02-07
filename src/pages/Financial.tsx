@@ -20,6 +20,7 @@ export default function Financial() {
   const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(null)
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'next_quarter' | 'next_year' | 'all'>('month')
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'paid' | 'pending' | 'cancelled'>('all')
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<'paid' | 'pending' | 'cancelled' | null>(null)
   useEffect(() => {
     loadData()
   }, [])
@@ -281,6 +282,31 @@ export default function Financial() {
     count: data.count
   }))
 
+  const handleStatusSelect = (status: 'paid' | 'pending' | 'cancelled') => {
+    setSelectedPaymentStatus((current) => (current === status ? null : status))
+  }
+
+  const selectedStatusSessions = selectedPaymentStatus
+    ? statusChartSessions
+        .filter((session) => (session.payment_status || 'pending') === selectedPaymentStatus)
+        .sort((a, b) => parseISO(a.session_date).getTime() - parseISO(b.session_date).getTime())
+    : []
+
+  const selectedStatusGroups = selectedPaymentStatus
+    ? (() => {
+        const map = new Map<string, { patientName: string; sessions: Session[] }>()
+        selectedStatusSessions.forEach((session) => {
+          const patientId = session.patient_id || session.patients?.id || session.id
+          const patientName = session.patients?.full_name || 'Paciente'
+          if (!map.has(patientId)) {
+            map.set(patientId, { patientName, sessions: [] })
+          }
+          map.get(patientId)!.sessions.push(session)
+        })
+        return Array.from(map.values())
+      })()
+    : []
+
   const frequencyLabels: Record<string, string> = {
     weekly: 'Semanal',
     biweekly: 'Quinzenal',
@@ -530,7 +556,14 @@ export default function Financial() {
                         : entry.status === 'cancelled'
                           ? '#ef4444'
                           : '#94a3b8'
-                    return <Cell key={`cell-status-${index}`} fill={color} />
+                    return (
+                      <Cell
+                        key={`cell-status-${index}`}
+                        fill={color}
+                        onClick={() => handleStatusSelect(entry.status as 'paid' | 'pending' | 'cancelled')}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    )
                   })}
                 </Pie>
                 <Tooltip
@@ -550,6 +583,61 @@ export default function Financial() {
                 />
               </PieChart>
             </ResponsiveContainer>
+          )}
+
+          {selectedPaymentStatus ? (
+            <div className="mt-6 border-t border-gray-200 pt-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium text-gray-900">
+                  Sessões {statusLabels[selectedPaymentStatus] || selectedPaymentStatus}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentStatus(null)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Limpar seleção
+                </button>
+              </div>
+
+              {selectedStatusGroups.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhuma sessão encontrada para este status.</p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedStatusGroups.map((group) => {
+                    const totalAmount = group.sessions.reduce(
+                      (sum, session) => sum + Number(session.session_price || 0),
+                      0
+                    )
+                    const groupKey = group.sessions[0]?.id || group.patientName
+                    return (
+                      <div key={groupKey} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium text-gray-900">{group.patientName}</p>
+                          <p className="text-xs text-gray-500">
+                            {group.sessions.length} sessões · R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="mt-3 space-y-2 text-sm text-gray-600">
+                          {group.sessions.map((session) => (
+                            <div key={session.id} className="flex flex-wrap items-center justify-between gap-2">
+                              <span>
+                                {format(parseISO(session.session_date), 'dd/MM/yyyy HH:mm')} · {session.session_type || 'Sessão'}
+                              </span>
+                              <span className="font-medium text-gray-900">
+                                R$ {Number(session.session_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-gray-500">Clique em um status para ver as sessões.</p>
           )}
         </div>
 
