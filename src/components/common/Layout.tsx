@@ -74,6 +74,10 @@ export default function Layout({ children }: LayoutProps) {
     try {
       const { error } = await authService.signOut()
       if (error) throw error
+      if (typeof window !== 'undefined') {
+        window.location.assign('/auth')
+        return
+      }
       navigate('/auth')
       toast.success('Logout realizado com sucesso')
     } catch (error: any) {

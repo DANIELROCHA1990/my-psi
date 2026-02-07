@@ -275,6 +275,7 @@ export default function Financial() {
   }, {} as Record<string, { value: number; count: number }>)
 
   const paymentStatusChartData = Object.entries(statusTotals).map(([status, data]) => ({
+    status,
     name: statusLabels[status] || status,
     value: data.value,
     count: data.count
@@ -521,9 +522,16 @@ export default function Financial() {
                   label={false}
                   labelLine={false}
                 >
-                  {paymentStatusChartData.map((entry, index) => (
-                    <Cell key={`cell-status-${index}`} fill={['#10b981', '#f59e0b', '#ef4444', '#94a3b8'][index % 4]} />
-                  ))}
+                  {paymentStatusChartData.map((entry, index) => {
+                    const color = entry.status === 'paid'
+                      ? '#10b981'
+                      : entry.status === 'pending'
+                        ? '#f59e0b'
+                        : entry.status === 'cancelled'
+                          ? '#ef4444'
+                          : '#94a3b8'
+                    return <Cell key={`cell-status-${index}`} fill={color} />
+                  })}
                 </Pie>
                 <Tooltip
                   formatter={(value, name, props: any) => {
