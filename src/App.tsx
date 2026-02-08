@@ -15,6 +15,8 @@ import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
 import PushAgendaPreview from './pages/PushAgendaPreview'
 import ScheduleLink from './pages/ScheduleLink'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 import { supabase } from './lib/supabase'
 import { listenForForegroundMessages } from './lib/pushSubscription'
 import { Eye, EyeOff, Lock } from 'lucide-react'
@@ -108,6 +110,8 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/privacidade" element={<PrivacyPolicy />} />
+        <Route path="/termos" element={<TermsOfService />} />
         <Route path="/notificacoes" element={<Notifications />} />
         <Route path="/push" element={<Navigate to="/notificacoes" replace />} />
         <Route path="/push/agenda" element={<PushAgendaPreview />} />
