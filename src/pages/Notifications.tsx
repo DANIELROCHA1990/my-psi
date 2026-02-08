@@ -1,15 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   disablePushToken,
+  disableUserPushToken,
   getPushSubscriptionStatus,
   getPushSupportStatus,
+  getUserPushSubscriptionStatus,
   getPushErrorMessage,
   listenForForegroundMessages,
-  registerPushToken
+  registerPushToken,
+  registerUserPushToken
 } from '../lib/pushSubscription'
 import { isFirebaseConfigured } from '../lib/firebase'
+import { useAuth } from '../hooks/useAuth'
 
 const PERMISSION_LABELS: Record<NotificationPermission, string> = {
   default: 'Não definido',
@@ -18,10 +22,14 @@ const PERMISSION_LABELS: Record<NotificationPermission, string> = {
 }
 
 export default function Notifications() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const consentToken = useMemo(() => {
     return searchParams.get('consent') || searchParams.get('token') || ''
   }, [searchParams])
+
+  const isUserMode = !consentToken && Boolean(user)
 
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [supported, setSupported] = useState<boolean | null>(null)
@@ -58,11 +66,6 @@ export default function Notifications() {
     let active = true
 
     const loadStatus = async () => {
-      if (!consentToken) {
-        setStatusMessage('Link de consentimento não encontrado.')
-        return
-      }
-
       if (supported === false) {
         setStatusMessage(supportReason || 'Notificações não suportadas neste dispositivo.')
         return
@@ -74,11 +77,25 @@ export default function Notifications() {
 
       setChecking(true)
       try {
-        const status = await getPushSubscriptionStatus(consentToken)
-        if (!active) return
-        setSubscribed(status.isEnabled)
-        setLastSeenAt(status.lastSeenAt)
-        setStatusMessage(status.isEnabled ? 'Lembretes ativados.' : 'Lembretes ainda não ativados.')
+        if (consentToken) {
+          const status = await getPushSubscriptionStatus(consentToken)
+          if (!active) return
+          setSubscribed(status.isEnabled)
+          setLastSeenAt(status.lastSeenAt)
+          setStatusMessage(status.isEnabled ? 'Lembretes ativados.' : 'Lembretes ainda não ativados.')
+          return
+        }
+
+        if (user) {
+          const status = await getUserPushSubscriptionStatus()
+          if (!active) return
+          setSubscribed(status.isEnabled)
+          setLastSeenAt(status.lastSeenAt)
+          setStatusMessage(status.isEnabled ? 'Notificações ativadas.' : 'Notificações ainda não ativadas.')
+          return
+        }
+
+        setStatusMessage('Link de consentimento não encontrado.')
       } catch (error) {
         console.error('Erro ao verificar push:', error)
         if (!active) return
@@ -93,7 +110,7 @@ export default function Notifications() {
     return () => {
       active = false
     }
-  }, [consentToken, supported, supportReason])
+  }, [consentToken, supported, supportReason, user])
 
   useEffect(() => {
     let unsubscribe = () => {}
@@ -113,11 +130,6 @@ export default function Notifications() {
   }, [permission])
 
   const handleEnable = async () => {
-    if (!consentToken) {
-      toast.error('Link de consentimento inválido.')
-      return
-    }
-
     if (!isFirebaseConfigured) {
       toast.error('Firebase não configurado neste portal.')
       return
@@ -134,10 +146,25 @@ export default function Notifications() {
         return
       }
 
-      await registerPushToken(consentToken, { source: 'portal' })
-      setSubscribed(true)
-      setStatusMessage('Lembretes ativados com sucesso!')
-      toast.success('Lembretes ativados')
+      if (consentToken) {
+        await registerPushToken(consentToken, { source: 'portal' })
+        setSubscribed(true)
+        setStatusMessage('Lembretes ativados com sucesso!')
+        toast.success('Lembretes ativados')
+        if (user) navigate('/')
+        return
+      }
+
+      if (user) {
+        await registerUserPushToken({ source: 'owner' })
+        setSubscribed(true)
+        setStatusMessage('Notificações ativadas com sucesso!')
+        toast.success('Notificações ativadas')
+        navigate('/')
+        return
+      }
+
+      toast.error('Faça login para ativar as notificações.')
     } catch (error) {
       console.error('Erro ao ativar push:', error)
       const message = getPushErrorMessage(error)
@@ -149,17 +176,27 @@ export default function Notifications() {
   }
 
   const handleDisable = async () => {
-    if (!consentToken) {
-      toast.error('Link de consentimento inválido.')
-      return
-    }
-
     setWorking(true)
     try {
-      await disablePushToken(consentToken)
-      setSubscribed(false)
-      setStatusMessage('Lembretes desativados.')
-      toast.success('Lembretes desativados')
+      if (consentToken) {
+        await disablePushToken(consentToken)
+        setSubscribed(false)
+        setStatusMessage('Lembretes desativados.')
+        toast.success('Lembretes desativados')
+        if (user) navigate('/')
+        return
+      }
+
+      if (user) {
+        await disableUserPushToken()
+        setSubscribed(false)
+        setStatusMessage('Notificações desativadas.')
+        toast.success('Notificações desativadas')
+        navigate('/')
+        return
+      }
+
+      toast.error('Faça login para desativar as notificações.')
     } catch (error) {
       console.error('Erro ao desativar push:', error)
       toast.error('Falha ao desativar lembretes')
@@ -182,9 +219,13 @@ export default function Notifications() {
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900">Lembretes de consulta</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {isUserMode ? 'Notificações de agendamento' : 'Lembretes de consulta'}
+            </h1>
             <p className="text-gray-600">
-              Você vai receber lembretes de consulta no navegador deste dispositivo. Você pode desativar quando quiser.
+              {isUserMode
+                ? 'Você vai receber um aviso quando um paciente preencher o link de agendamento.'
+                : 'Você vai receber lembretes de consulta no navegador deste dispositivo. Você pode desativar quando quiser.'}
             </p>
           </div>
 
@@ -231,7 +272,7 @@ export default function Notifications() {
               disabled={working || subscribed || supported === false}
               className="flex-1 px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-60"
             >
-              {working ? 'Ativando...' : subscribed ? 'Lembretes ativados' : 'Ativar lembretes'}
+              {working ? 'Ativando...' : subscribed ? (isUserMode ? 'Notificações ativadas' : 'Lembretes ativados') : (isUserMode ? 'Ativar notificações' : 'Ativar lembretes')}
             </button>
             <button
               type="button"
@@ -245,7 +286,9 @@ export default function Notifications() {
 
           <div className="mt-8 text-sm text-gray-500 space-y-2">
             <p>Se estiver usando outro navegador ou dispositivo, repita o processo neste dispositivo.</p>
-            <p>Ao ativar, você concorda em receber lembretes relacionados apenas às suas consultas agendadas.</p>
+            <p>{isUserMode
+                ? 'Ao ativar, você concorda em receber notificações relacionadas a novos agendamentos.'
+                : 'Ao ativar, você concorda em receber lembretes relacionados apenas às suas consultas agendadas.'}</p>
           </div>
         </div>
       </div>

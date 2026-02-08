@@ -286,6 +286,24 @@ export default function Settings() {
         <div className="p-4 sm:p-6">
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-6">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">Ativar Notificações?</h3>
+                    <p className="text-sm text-gray-600">
+                      Receba avisos quando um paciente preencher o link de agendamento.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/notificacoes')}
+                    className="inline-flex items-center justify-center rounded-lg border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Abrir notificações
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
