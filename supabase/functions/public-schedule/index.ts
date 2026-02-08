@@ -1,6 +1,7 @@
 /// <reference path="../deno.d.ts" />
 import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
+import nodemailer from 'npm:nodemailer@6.9.8'
 
 declare const Deno: {
   env: {
@@ -28,6 +29,64 @@ const getDateRangeIso = (dateString: string, offsetValue?: string | null) => {
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
   return { startIso: start.toISOString(), endIso: end.toISOString() }
 }
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const formatDateLabel = (dateString: string) => {
+  const [year, month, day] = dateString.split('-')
+  if (!year || !month || !day) {
+    return dateString
+  }
+  return `${day}/${month}/${year}`
+}
+
+const buildScheduleNotificationHtml = (payload: {
+  patientName: string
+  patientPhone: string
+  dateLabel: string
+  timeLabel: string
+}) => `
+  <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f9fafb; padding: 24px;">
+    <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px;">
+      <h2 style="margin: 0 0 12px; color: #111827;">Novo agendamento solicitado</h2>
+      <p style="margin: 0 0 8px; color: #4b5563;">Um paciente preencheu o link de agendamento.</p>
+      <div style="margin-top: 16px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px;">
+        <p style="margin: 0 0 6px; color: #111827;"><strong>Paciente:</strong> ${escapeHtml(
+          payload.patientName
+        )}</p>
+        <p style="margin: 0 0 6px; color: #111827;"><strong>Telefone:</strong> ${escapeHtml(
+          payload.patientPhone
+        )}</p>
+        <p style="margin: 0 0 6px; color: #111827;"><strong>Data:</strong> ${escapeHtml(
+          payload.dateLabel
+        )}</p>
+        <p style="margin: 0; color: #111827;"><strong>Horario:</strong> ${escapeHtml(
+          payload.timeLabel
+        )}</p>
+      </div>
+    </div>
+  </div>
+`
+
+const buildScheduleNotificationText = (payload: {
+  patientName: string
+  patientPhone: string
+  dateLabel: string
+  timeLabel: string
+}) =>
+  [
+    'Novo agendamento solicitado',
+    `Paciente: ${payload.patientName}`,
+    `Telefone: ${payload.patientPhone}`,
+    `Data: ${payload.dateLabel}`,
+    `Horario: ${payload.timeLabel}`
+  ].join('\n')
 
 type SessionRow = {
   id: string
@@ -243,8 +302,78 @@ serve(async (req) => {
       return buildDbError('Erro ao criar sessao', sessionError)
     }
 
+    let notificationSent = false
+    if (link.user_id) {
+      const { data: profile, error: profileError } = await adminClient
+        .from('profiles')
+        .select('email')
+        .eq('user_id', link.user_id)
+        .maybeSingle()
+
+      if (profileError) {
+        console.error('Erro ao buscar email do perfil:', profileError)
+      }
+
+      let userEmail = profile?.email || null
+      if (!userEmail) {
+        const { data: authData, error: authError } = await adminClient.auth.admin.getUserById(link.user_id)
+        if (authError) {
+          console.error('Erro ao buscar email do usuario:', authError)
+        }
+        userEmail = authData?.user?.email || null
+      }
+
+      const smtpHost = getEnv('SMTP_HOST') || ''
+      const smtpPort = Number(getEnv('SMTP_PORT') || '587')
+      const smtpUser = getEnv('SMTP_USER') || ''
+      const smtpPass = getEnv('SMTP_PASS') || ''
+      const smtpFrom = getEnv('SMTP_FROM') || ''
+      const smtpFromName = getEnv('SMTP_FROM_NAME') || 'Agendamento'
+
+      if (userEmail && smtpHost && smtpFrom) {
+        try {
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined
+          })
+
+          const dateLabel = formatDateLabel(date)
+          const timeLabel = time
+          const notificationPayload = {
+            patientName: fullName,
+            patientPhone: phone,
+            dateLabel,
+            timeLabel
+          }
+
+          await transporter.sendMail({
+            from: `${smtpFromName} <${smtpFrom}>`,
+            to: userEmail,
+            subject: `Novo agendamento solicitado - ${dateLabel} ${timeLabel}`,
+            text: buildScheduleNotificationText(notificationPayload),
+            html: buildScheduleNotificationHtml(notificationPayload)
+          })
+
+          notificationSent = true
+        } catch (error) {
+          console.error('Erro ao enviar email de agendamento:', error)
+        }
+      } else if (!userEmail) {
+        console.error('Email do usuario nao encontrado para notificacao.')
+      } else {
+        console.error('SMTP nao configurado para notificacao de agendamento.')
+      }
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, patient_id: createdPatient.id, session_id: createdSession.id }),
+      JSON.stringify({
+        ok: true,
+        patient_id: createdPatient.id,
+        session_id: createdSession.id,
+        notification_sent: notificationSent
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
