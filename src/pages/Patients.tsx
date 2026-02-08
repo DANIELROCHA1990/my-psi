@@ -845,6 +845,8 @@ function PatientModal({
     session_frequency: patient?.session_frequency || 'weekly',
     session_price: patient?.session_price?.toString() || '',
     session_link: patient?.session_link || '',
+    meet_event_id: patient?.meet_event_id || '',
+    meet_calendar_id: patient?.meet_calendar_id || '',
     active: initialActive,
     auto_renew_sessions: patient?.auto_renew_sessions ?? false,
     calendar_color: initialCalendarColor
@@ -860,6 +862,7 @@ function PatientModal({
     isNewPatient || forceManageAutoSessions || (patient?.session_schedules?.length ?? 0) > 0
   )
   const [loading, setLoading] = useState(false)
+  const [generatingMeetLink, setGeneratingMeetLink] = useState(false)
   const [conflictInfo, setConflictInfo] = useState<{
     patientName: string
     nextAvailableStart: Date
@@ -888,6 +891,63 @@ function PatientModal({
     { label: 'Turquesa', value: '#14b8a6' },
     { label: 'Vermelho', value: '#ef4444' }
   ]
+
+  const handleGenerateMeetLink = async () => {
+    if (generatingMeetLink) return
+
+    const name = (formData.full_name || patient?.full_name || '').trim()
+    if (!name) {
+      toast.error('Informe o nome do paciente para gerar o link.')
+      return
+    }
+
+    setGeneratingMeetLink(true)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token || ''
+      const payload = patient?.id
+        ? { patientId: patient.id, accessToken }
+        : { patientName: name, accessToken }
+
+      const { data, error } = await supabase.functions.invoke('google-meet-link', {
+        body: payload,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      })
+
+      if (error) {
+        const message = (error as { message?: string })?.message || 'Falha ao gerar link do Google Meet.'
+        if (message.toLowerCase().includes('google_not_connected')) {
+          toast.error('Conecte sua conta Google em Configurações para gerar links fixos.')
+        } else {
+          toast.error(message)
+        }
+        return
+      }
+
+      if (!data?.link) {
+        toast.error('Link do Google Meet não retornado.')
+        return
+      }
+
+      setHasSessionLink(true)
+      setFormData(prev => ({
+        ...prev,
+        session_link: data.link,
+        meet_event_id: data.eventId || prev.meet_event_id || '',
+        meet_calendar_id: data.calendarId || prev.meet_calendar_id || ''
+      }))
+      toast.success('Link do Google Meet gerado.')
+    } catch (err: any) {
+      const message = String(err?.message || 'Falha ao gerar link do Google Meet.')
+      if (message.toLowerCase().includes('google_not_connected')) {
+        toast.error('Conecte sua conta Google em Configurações para gerar links fixos.')
+      } else {
+        toast.error(message)
+      }
+    } finally {
+      setGeneratingMeetLink(false)
+    }
+  }
   
   const addSchedule = () => {
     setSessionSchedules([...sessionSchedules, {
@@ -1061,6 +1121,8 @@ function PatientModal({
         session_schedules: sessionSchedules.length > 0 ? sessionSchedules : patient?.session_schedules || null,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         session_link: hasSessionLink ? (formData.session_link?.trim() || null) : null,
+        meet_event_id: hasSessionLink ? (formData.meet_event_id?.trim() || null) : null,
+        meet_calendar_id: hasSessionLink ? (formData.meet_calendar_id?.trim() || null) : null,
         calendar_color: normalizedCalendarColor || null,
         birth_date: formData.birth_date || undefined,
         email: formData.email || undefined,
@@ -1513,7 +1575,12 @@ function PatientModal({
                         const checked = e.target.checked
                         setHasSessionLink(checked)
                         if (!checked) {
-                          setFormData(prev => ({ ...prev, session_link: '' }))
+                          setFormData(prev => ({
+                            ...prev,
+                            session_link: '',
+                            meet_event_id: '',
+                            meet_calendar_id: ''
+                          }))
                         }
                       }}
                       className="sr-only peer"
@@ -1523,14 +1590,29 @@ function PatientModal({
                 </div>
                 {hasSessionLink && (
                   <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Link do atendimento
-                    </label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Link do atendimento
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateMeetLink}
+                        disabled={generatingMeetLink}
+                        className="text-xs font-medium text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                      >
+                        {generatingMeetLink ? 'Gerando...' : 'Gerar Link'}
+                      </button>
+                    </div>
                     <input
                       type="url"
                       value={formData.session_link}
-                      onChange={(e) => setFormData(prev => ({ ...prev, session_link: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        session_link: e.target.value,
+                        meet_event_id: '',
+                        meet_calendar_id: ''
+                      }))}
+                      className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                       placeholder="https://"
                     />
                   </div>

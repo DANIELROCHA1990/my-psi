@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { profileService } from '../services/profileService'
 import { authService } from '../services/authService'
 import { Profile } from '../types'
-import { User, Lock, Mail, Phone, MapPin, DollarSign, Save, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, Mail, Phone, MapPin, DollarSign, Save, Eye, EyeOff, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
 export default function Settings() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [googleConnection, setGoogleConnection] = useState<{
+    email?: string | null
+    connected_at?: string | null
+  } | null>(null)
+  const [loadingGoogle, setLoadingGoogle] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
 
   const [profileData, setProfileData] = useState({
     full_name: '',
@@ -42,6 +49,33 @@ export default function Settings() {
   useEffect(() => {
     loadProfile()
   }, [])
+
+  useEffect(() => {
+    loadGoogleConnection()
+  }, [])
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['profile', 'security', 'integrations'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const googleParam = searchParams.get('google')
+    if (!googleParam) {
+      return
+    }
+    if (googleParam === 'connected') {
+      toast.success('Google conectado com sucesso')
+      loadGoogleConnection()
+    } else if (googleParam === 'error') {
+      toast.error('Falha ao conectar com o Google')
+    }
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('google')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const loadProfile = async () => {
     try {
@@ -72,6 +106,29 @@ export default function Settings() {
       console.error('Error loading profile:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadGoogleConnection = async () => {
+    try {
+      setLoadingGoogle(true)
+      const { data, error } = await supabase
+        .from('google_oauth_connections')
+        .select('email, connected_at')
+        .maybeSingle()
+
+      if (error) {
+        console.error('Erro ao carregar conexÃ£o Google:', error)
+        setGoogleConnection(null)
+        return
+      }
+
+      setGoogleConnection(data || null)
+    } catch (error) {
+      console.error('Erro ao carregar conexÃ£o Google:', error)
+      setGoogleConnection(null)
+    } finally {
+      setLoadingGoogle(false)
     }
   }
 
@@ -148,6 +205,84 @@ export default function Settings() {
       session = data.session
     }
     return Boolean(session)
+  }
+
+  const getAccessToken = async () => {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token || ''
+  }
+
+  const handleConnectGoogle = async () => {
+    if (googleBusy) return
+    setGoogleBusy(true)
+    try {
+      const sessionOk = await ensureValidSession()
+      if (!sessionOk) {
+        await handleAuthFailure('refresh token')
+        return
+      }
+
+      const rawSupabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '')
+      const useLocalCallback = /localhost|127\.0\.0\.1/i.test(rawSupabaseUrl)
+      const accessToken = await getAccessToken()
+      const { data, error } = await supabase.functions.invoke('google-oauth-start', {
+        body: {
+          accessToken,
+          appOrigin: window.location.origin,
+          useLocalCallback
+        },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      })
+
+      if (error) {
+        toast.error('Falha ao iniciar conexÃ£o com o Google')
+        return
+      }
+
+      const url = data?.url
+      if (!url || typeof url !== 'string') {
+        toast.error('URL de conexÃ£o nÃ£o retornada')
+        return
+      }
+
+      window.location.assign(url)
+    } catch (error) {
+      console.error('Erro ao conectar Google:', error)
+      toast.error('Falha ao iniciar conexÃ£o com o Google')
+    } finally {
+      setGoogleBusy(false)
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    if (googleBusy) return
+    setGoogleBusy(true)
+    try {
+      const sessionOk = await ensureValidSession()
+      if (!sessionOk) {
+        await handleAuthFailure('refresh token')
+        return
+      }
+
+      const accessToken = await getAccessToken()
+      const { error } = await supabase.functions.invoke('google-oauth-disconnect', {
+        body: { accessToken },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      })
+
+      if (error) {
+        toast.error('Falha ao desconectar Google')
+        return
+      }
+
+      setGoogleConnection(null)
+      toast.success('Google desconectado')
+    } catch (error) {
+      console.error('Erro ao desconectar Google:', error)
+      toast.error('Falha ao desconectar Google')
+    } finally {
+      setGoogleBusy(false)
+    }
   }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -277,6 +412,19 @@ export default function Settings() {
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
                 Segurança
+              </div>
+            </button>
+                      <button
+              onClick={() => setActiveTab('integrations')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'integrations'
+                  ? 'border-emerald-500 text-emerald-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                IntegraÃ§Ãµes
               </div>
             </button>
           </nav>
@@ -616,6 +764,51 @@ export default function Settings() {
                 </button>
               </div>
             </form>
+          )}
+
+          {activeTab === 'integrations' && (
+            <div className="space-y-6">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">Google Meet (link fixo)</h3>
+                    <p className="text-sm text-gray-600">
+                      Conecte sua conta Google para gerar links fixos de atendimento por paciente.
+                    </p>
+                    {loadingGoogle ? (
+                      <p className="text-xs text-gray-500 mt-2">Carregando status...</p>
+                    ) : googleConnection ? (
+                      <p className="text-xs text-emerald-700 mt-2">
+                        Conectado{googleConnection.email ? ` como ${googleConnection.email}` : ''}.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-2">NÃ£o conectado.</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    {googleConnection ? (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectGoogle}
+                        disabled={googleBusy}
+                        className="inline-flex items-center justify-center rounded-lg border border-red-500 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Desconectar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectGoogle}
+                        disabled={googleBusy}
+                        className="inline-flex items-center justify-center rounded-lg border border-emerald-600 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                      >
+                        Conectar Google
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
         </div>
