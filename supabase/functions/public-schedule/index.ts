@@ -2,6 +2,8 @@
 import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import nodemailer from 'npm:nodemailer@6.9.8'
+import { cert, getApps, initializeApp } from 'npm:firebase-admin/app'
+import { getMessaging } from 'npm:firebase-admin/messaging'
 
 declare const Deno: {
   env: {
@@ -44,6 +46,31 @@ const formatDateLabel = (dateString: string) => {
     return dateString
   }
   return `${day}/${month}/${year}`
+}
+
+const initializeFirebase = () => {
+  const projectId = getEnv('FIREBASE_PROJECT_ID') || ''
+  const clientEmail = getEnv('FIREBASE_CLIENT_EMAIL') || ''
+  const privateKey = (getEnv('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Firebase Admin credentials not configured')
+  }
+
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+      projectId
+    })
+  }
+}
+
+const isInvalidToken = (code?: string) => {
+  if (!code) return false
+  return (
+    code.includes('registration-token-not-registered') ||
+    code.includes('invalid-registration-token')
+  )
 }
 
 const buildScheduleNotificationHtml = (payload: {
@@ -303,6 +330,7 @@ serve(async (req) => {
     }
 
     let notificationSent = false
+    let pushSent = false
     if (link.user_id) {
       const { data: profile, error: profileError } = await adminClient
         .from('profiles')
@@ -365,6 +393,91 @@ serve(async (req) => {
       } else {
         console.error('SMTP nao configurado para notificacao de agendamento.')
       }
+
+      const { data: pushSubscriptions, error: pushError } = await adminClient
+        .from('user_push_subscriptions')
+        .select('token')
+        .eq('user_id', link.user_id)
+        .eq('is_enabled', true)
+
+      if (pushError) {
+        console.error('Erro ao buscar assinaturas de push:', pushError)
+      }
+
+      const tokens = Array.from(
+        new Set((pushSubscriptions || []).map((sub) => sub.token).filter(Boolean))
+      )
+
+      if (tokens.length) {
+        const dateLabel = formatDateLabel(date)
+        const timeLabel = time
+        const title = 'Novo agendamento solicitado'
+        const body = `${fullName} - ${dateLabel} ${timeLabel}`
+
+        try {
+          initializeFirebase()
+          const messaging = getMessaging()
+
+          const route = new URL('/calendar', 'https://example.org')
+          route.searchParams.set('date', date)
+          const routePath = route.pathname + route.search
+
+          const dataPayload = {
+            route: routePath,
+            title,
+            body,
+            patient_name: fullName,
+            patient_phone: phone,
+            date,
+            time,
+            patient_id: createdPatient.id,
+            session_id: createdSession.id
+          }
+
+          const message = {
+            tokens,
+            webpush: {
+              fcmOptions: {
+                link: routePath
+              }
+            },
+            data: Object.fromEntries(
+              Object.entries(dataPayload).map(([key, value]) => [key, String(value ?? '')])
+            )
+          }
+
+          const response = await messaging.sendEachForMulticast(message)
+          pushSent = response.successCount > 0
+
+          const invalidTokens: string[] = []
+          response.responses.forEach((entry, index) => {
+            if (entry.success) return
+            const errorCode = entry.error?.code
+            if (isInvalidToken(errorCode)) {
+              invalidTokens.push(tokens[index])
+            }
+          })
+
+          if (invalidTokens.length) {
+            const { error: disableError } = await adminClient
+              .from('user_push_subscriptions')
+              .update({
+                is_enabled: false,
+                meta: {
+                  disabled_reason: 'invalid_token',
+                  updated_at: new Date().toISOString()
+                }
+              })
+              .in('token', invalidTokens)
+
+            if (disableError) {
+              console.error('Erro ao desativar tokens de push:', disableError)
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao enviar push de agendamento:', error)
+        }
+      }
     }
 
     return new Response(
@@ -372,7 +485,8 @@ serve(async (req) => {
         ok: true,
         patient_id: createdPatient.id,
         session_id: createdSession.id,
-        notification_sent: notificationSent
+        notification_sent: notificationSent,
+        push_sent: pushSent
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

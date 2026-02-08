@@ -18,6 +18,7 @@ import ScheduleLink from './pages/ScheduleLink'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import { supabase } from './lib/supabase'
+import { listenForForegroundMessages } from './lib/pushSubscription'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 
 export default function App() {
@@ -47,6 +48,23 @@ export default function App() {
     const hasChanged = Boolean(metadata.password_changed_at)
     setForcePasswordChange(!hasChanged)
   }, [user])
+
+  useEffect(() => {
+    let unsubscribe = () => {}
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      listenForForegroundMessages((payload) => {
+        const title = payload.data?.title || payload.notification?.title || 'Notificação'
+        const body = payload.data?.body || payload.notification?.body || ''
+        toast.success(`${title}${body ? ` - ${body}` : ''}`)
+      }).then((unsub) => {
+        unsubscribe = unsub
+      })
+    }
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
 
   const handleForcePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
