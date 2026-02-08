@@ -10,6 +10,7 @@ import { supabase } from './supabase'
 import { getFirebaseApp, isFirebaseConfigured } from './firebase'
 
 const STORAGE_KEY = 'myPsiPushToken'
+const USER_STORAGE_KEY = 'myPsiUserPushToken'
 
 export type PushSupportStatus = {
   supported: boolean
@@ -37,6 +38,11 @@ export const getStoredPushToken = () => {
   return window.localStorage.getItem(STORAGE_KEY)
 }
 
+export const getStoredUserPushToken = () => {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(USER_STORAGE_KEY)
+}
+
 const setStoredPushToken = (token: string | null) => {
   if (typeof window === 'undefined') return
   if (!token) {
@@ -44,6 +50,15 @@ const setStoredPushToken = (token: string | null) => {
     return
   }
   window.localStorage.setItem(STORAGE_KEY, token)
+}
+
+const setStoredUserPushToken = (token: string | null) => {
+  if (typeof window === 'undefined') return
+  if (!token) {
+    window.localStorage.removeItem(USER_STORAGE_KEY)
+    return
+  }
+  window.localStorage.setItem(USER_STORAGE_KEY, token)
 }
 
 const getMessagingInstance = async () => {
@@ -169,6 +184,60 @@ export const registerPushToken = async (consentToken: string, meta?: Record<stri
   return token
 }
 
+export const registerUserPushToken = async (meta?: Record<string, unknown>) => {
+  const messaging = await getMessagingInstance()
+  if (!messaging) {
+    throw new Error('Push nÃ£o suportado ou Firebase nÃ£o configurado.')
+  }
+
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
+  if (!vapidKey) {
+    throw new Error('VAPID key nÃ£o configurada.')
+  }
+
+  const registration = await ensureServiceWorker()
+  let token: string
+  try {
+    token = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration
+    })
+  } catch (error) {
+    throw new Error(`Erro ao obter token FCM: ${toErrorMessage(error)}`)
+  }
+
+  if (!token) {
+    throw new Error('Falha ao obter token de notificaÃ§Ã£o.')
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError || !userData?.user) {
+    throw new Error('UsuÃ¡rio nÃ£o autenticado.')
+  }
+
+  const { error } = await supabase
+    .from('user_push_subscriptions')
+    .upsert(
+      {
+        user_id: userData.user.id,
+        token,
+        platform: 'web',
+        browser: getBrowserLabel(navigator.userAgent),
+        is_enabled: true,
+        last_seen_at: new Date().toISOString(),
+        meta: meta ?? {}
+      },
+      { onConflict: 'token' }
+    )
+
+  if (error) {
+    throw new Error(`Falha ao salvar assinatura: ${toErrorMessage(error)}`)
+  }
+
+  setStoredUserPushToken(token)
+  return token
+}
+
 export const disablePushToken = async (consentToken: string) => {
   if (!consentToken) {
     throw new Error('Token de consentimento ausente.')
@@ -196,6 +265,38 @@ export const disablePushToken = async (consentToken: string) => {
   setStoredPushToken(null)
 }
 
+export const disableUserPushToken = async () => {
+  const token = getStoredUserPushToken()
+  const messaging = await getMessagingInstance()
+
+  if (messaging) {
+    await deleteToken(messaging)
+  }
+
+  if (token) {
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError || !userData?.user) {
+      throw new Error('UsuÃ¡rio nÃ£o autenticado.')
+    }
+
+    const { error } = await supabase
+      .from('user_push_subscriptions')
+      .update({
+        is_enabled: false,
+        meta: { disabled_reason: 'user_disabled' },
+        last_seen_at: new Date().toISOString()
+      })
+      .eq('user_id', userData.user.id)
+      .eq('token', token)
+
+    if (error) {
+      throw error
+    }
+  }
+
+  setStoredUserPushToken(null)
+}
+
 export const getPushSubscriptionStatus = async (consentToken: string): Promise<PushSubscriptionStatus> => {
   const token = getStoredPushToken()
   if (!token) {
@@ -216,6 +317,35 @@ export const getPushSubscriptionStatus = async (consentToken: string): Promise<P
     token,
     isEnabled: Boolean(row?.is_enabled),
     lastSeenAt: row?.last_seen_at ?? null
+  }
+}
+
+export const getUserPushSubscriptionStatus = async (): Promise<PushSubscriptionStatus> => {
+  const token = getStoredUserPushToken()
+  if (!token) {
+    return { token: null, isEnabled: false }
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError || !userData?.user) {
+    throw new Error('UsuÃ¡rio nÃ£o autenticado.')
+  }
+
+  const { data, error } = await supabase
+    .from('user_push_subscriptions')
+    .select('is_enabled, last_seen_at')
+    .eq('user_id', userData.user.id)
+    .eq('token', token)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return {
+    token,
+    isEnabled: Boolean(data?.is_enabled),
+    lastSeenAt: data?.last_seen_at ?? null
   }
 }
 

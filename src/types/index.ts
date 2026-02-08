@@ -45,6 +45,8 @@ export interface Patient {
   session_frequency: string
   session_price?: number
   session_link?: string | null
+  meet_event_id?: string | null
+  meet_calendar_id?: string | null
   calendar_color?: string | null
   auto_renew_sessions?: boolean
   session_schedules?: SessionSchedule[]
