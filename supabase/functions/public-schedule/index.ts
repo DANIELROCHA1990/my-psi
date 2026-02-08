@@ -436,10 +436,6 @@ serve(async (req) => {
 
           const message = {
             tokens,
-            notification: {
-              title,
-              body
-            },
             webpush: {
               fcmOptions: {
                 link: routePath

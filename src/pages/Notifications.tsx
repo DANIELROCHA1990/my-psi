@@ -8,7 +8,6 @@ import {
   getPushSupportStatus,
   getUserPushSubscriptionStatus,
   getPushErrorMessage,
-  listenForForegroundMessages,
   registerPushToken,
   registerUserPushToken
 } from '../lib/pushSubscription'
@@ -111,23 +110,6 @@ export default function Notifications() {
       active = false
     }
   }, [consentToken, supported, supportReason, user])
-
-  useEffect(() => {
-    let unsubscribe = () => {}
-    if (permission === 'granted') {
-      listenForForegroundMessages((payload) => {
-        const title = payload.data?.title || payload.notification?.title || 'Lembrete de sessão'
-        const body = payload.data?.body || payload.notification?.body || ''
-        toast.success(`${title}${body ? ` - ${body}` : ''}`)
-      }).then((unsub) => {
-        unsubscribe = unsub
-      })
-    }
-
-    return () => {
-      unsubscribe()
-    }
-  }, [permission])
 
   const handleEnable = async () => {
     if (!isFirebaseConfigured) {
