@@ -108,6 +108,16 @@ export default function AuthForm() {
               </button>
             </div>
           </form>
+          <div className="mt-6 text-center text-xs text-gray-500">
+            Ao continuar, você concorda com nossos{' '}
+            <a href="/termos" className="text-emerald-700 hover:text-emerald-800 underline">
+              Termos de Serviço
+            </a>{' '}
+            e{' '}
+            <a href="/privacidade" className="text-emerald-700 hover:text-emerald-800 underline">
+              Política de Privacidade
+            </a>.
+          </div>
         </div>
       </div>
     </div>
