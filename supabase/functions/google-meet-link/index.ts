@@ -22,7 +22,35 @@ const jsonResponse = (payload: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 
+class GoogleAuthError extends Error {
+  code: string
+
+  constructor(code: string, message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
 const isMeetLink = (link?: string | null) => Boolean(link && link.includes('meet.google.com/'))
+
+const DEFAULT_EVENT_DURATION_MINUTES = 60
+
+const hasTimezoneInfo = (value: string) => /Z$|[+-]\d{2}:?\d{2}$/.test(value)
+
+const normalizeSessionDate = (value?: string | null): string | null => {
+  if (!value) {
+    return null
+  }
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const parsed = hasTimezoneInfo(trimmed) ? new Date(trimmed) : new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed.toISOString()
+}
 
 const extractMeetLink = (payload: any): string | null => {
   if (typeof payload?.hangoutLink === 'string') {
@@ -38,9 +66,16 @@ const extractMeetLink = (payload: any): string | null => {
   return null
 }
 
-const buildCalendarEventPayload = (patientName: string) => {
-  const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  const end = new Date(start.getTime() + 60 * 60 * 1000)
+const buildCalendarEventPayload = (
+  patientName: string,
+  sessionStartIso?: string | null,
+  durationMinutes = DEFAULT_EVENT_DURATION_MINUTES
+) => {
+  const start = sessionStartIso ? new Date(sessionStartIso) : new Date(Date.now() + 24 * 60 * 60 * 1000)
+  const duration = Number.isFinite(durationMinutes) && durationMinutes > 0
+    ? Math.round(durationMinutes)
+    : DEFAULT_EVENT_DURATION_MINUTES
+  const end = new Date(start.getTime() + duration * 60 * 1000)
   return {
     summary: `Atendimento - ${patientName}`,
     description: `Link fixo de atendimento para ${patientName}.`,
@@ -90,6 +125,12 @@ serve(async (req) => {
 
   const patientId = typeof body?.patientId === 'string' ? body.patientId.trim() : ''
   const patientNameFromBody = typeof body?.patientName === 'string' ? body.patientName.trim() : ''
+  const sessionDateFromBody = typeof body?.sessionDate === 'string' ? body.sessionDate.trim() : ''
+  const requestedSessionStartIso = normalizeSessionDate(sessionDateFromBody)
+  const requestedDurationMinutes =
+    typeof body?.durationMinutes === 'number' && body.durationMinutes > 0
+      ? body.durationMinutes
+      : DEFAULT_EVENT_DURATION_MINUTES
 
   if (!patientId && !patientNameFromBody) {
     return jsonResponse({ ok: false, error: 'Missing patient info' }, 400)
@@ -131,6 +172,12 @@ serve(async (req) => {
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
       console.error('Erro ao atualizar token Google:', data)
+      const errorCode = String(data?.error || '').toLowerCase()
+      if (errorCode === 'invalid_grant' || errorCode === 'unauthorized_client') {
+        await adminClient.from('google_oauth_tokens').delete().eq('user_id', userId)
+        await adminClient.from('google_oauth_connections').delete().eq('user_id', userId)
+        throw new GoogleAuthError('GOOGLE_NOT_CONNECTED', 'Google token revoked')
+      }
       throw new Error('Failed to refresh token')
     }
     const expiresIn = typeof data?.expires_in === 'number' ? data.expires_in : null
@@ -166,6 +213,9 @@ serve(async (req) => {
     try {
       accessToken = await refreshAccessToken()
     } catch (error) {
+      if (error instanceof GoogleAuthError && error.code === 'GOOGLE_NOT_CONNECTED') {
+        return jsonResponse({ ok: false, error: 'GOOGLE_NOT_CONNECTED' }, 409)
+      }
       return jsonResponse({ ok: false, error: 'Failed to refresh token' }, 500)
     }
   }
@@ -192,13 +242,79 @@ serve(async (req) => {
 
     patientRecord = patientData
 
-    if (isMeetLink(patientRecord.session_link)) {
+    if (isMeetLink(patientRecord.session_link) && !requestedSessionStartIso) {
       return jsonResponse({
         ok: true,
         link: patientRecord.session_link,
         eventId: patientRecord.meet_event_id,
         calendarId: patientRecord.meet_calendar_id
       })
+    }
+  }
+
+  const updateEventSchedule = async (
+    calendarId: string,
+    eventId: string,
+    patientName: string
+  ) => {
+    if (!requestedSessionStartIso) {
+      return null
+    }
+    const start = new Date(requestedSessionStartIso)
+    const end = new Date(start.getTime() + requestedDurationMinutes * 60 * 1000)
+    const payload = {
+      summary: `Atendimento - ${patientName}`,
+      description: `Link fixo de atendimento para ${patientName}.`,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() },
+      transparency: 'transparent',
+      visibility: 'private'
+    }
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(
+        eventId
+      )}?conferenceDataVersion=1`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+
+    if (!response.ok) {
+      const responseData = await response.json().catch(() => ({}))
+      console.error('Erro ao sincronizar data do evento Google:', responseData)
+      return null
+    }
+
+    return response.json().catch(() => ({}))
+  }
+
+  if (patientRecord?.meet_event_id && requestedSessionStartIso) {
+    try {
+      const calendarId = patientRecord.meet_calendar_id || 'primary'
+      const patientName = patientRecord.full_name || patientNameFromBody || 'Paciente'
+      const updatedEvent = await updateEventSchedule(calendarId, patientRecord.meet_event_id, patientName)
+      const existingLink = extractMeetLink(updatedEvent)
+
+      if (existingLink) {
+        await adminClient
+          .from('patients')
+          .update({ session_link: existingLink })
+          .eq('id', patientRecord.id)
+      }
+
+      return jsonResponse({
+        ok: true,
+        link: existingLink || patientRecord.session_link,
+        eventId: patientRecord.meet_event_id,
+        calendarId
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar evento Google:', error)
     }
   }
 
@@ -233,7 +349,11 @@ serve(async (req) => {
   }
 
   const patientName = patientRecord?.full_name || patientNameFromBody || 'Paciente'
-  const eventPayload = buildCalendarEventPayload(patientName)
+  const eventPayload = buildCalendarEventPayload(
+    patientName,
+    requestedSessionStartIso,
+    requestedDurationMinutes
+  )
 
   let eventResponse = await fetch(
     'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
