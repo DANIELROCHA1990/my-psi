@@ -57,6 +57,56 @@ function getFrequencyIntervalWeeks(frequency?: string) {
   }
 }
 
+const syncPatientMeetEventDate = async (params: {
+  patientId: string
+  sessionDate: string
+  durationMinutes?: number | null
+}) => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    let session = sessionData.session
+    const now = Math.floor(Date.now() / 1000)
+
+    if (!session || (session.expires_at && session.expires_at - now < 60)) {
+      const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError || !refreshedData.session) {
+        return
+      }
+      session = refreshedData.session
+    }
+
+    const accessToken = session.access_token || ''
+    if (!accessToken) {
+      return
+    }
+
+    const { error } = await supabase.functions.invoke('google-meet-link', {
+      body: {
+        patientId: params.patientId,
+        sessionDate: params.sessionDate,
+        durationMinutes: params.durationMinutes ?? DEFAULT_SESSION_DURATION_MINUTES,
+        accessToken
+      },
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+
+    if (error) {
+      const message = String((error as { message?: string })?.message || '')
+      if (
+        message.toLowerCase().includes('google_not_connected') ||
+        message.toLowerCase().includes('not connected')
+      ) {
+        return
+      }
+      console.error('Erro ao sincronizar data do Google Meet:', error)
+    }
+  } catch (error) {
+    console.error('Erro ao sincronizar data do Google Meet:', error)
+  }
+}
+
+const isMeetLink = (value?: string | null) => Boolean(value && value.includes('meet.google.com/'))
+
 const fetchSessions = async (): Promise<Session[]> => {
   const { data, error } = await supabase
     .from('sessions')
@@ -307,6 +357,14 @@ export const sessionService = {
       throw new Error(`Failed to create session: ${error.message}`)
     }
 
+    if (isMeetLink(data.patients?.session_link)) {
+      await syncPatientMeetEventDate({
+        patientId: data.patient_id,
+        sessionDate: data.session_date,
+        durationMinutes: data.duration_minutes
+      })
+    }
+
     return data
   },
 
@@ -386,6 +444,18 @@ export const sessionService = {
           console.error('Error deleting financial record for cancelled session:', financialError)
         }
       }
+    }
+
+    if (
+      updateData.session_date &&
+      updatedSession.payment_status !== 'cancelled' &&
+      isMeetLink(updatedSession.patients?.session_link)
+    ) {
+      await syncPatientMeetEventDate({
+        patientId: updatedSession.patient_id,
+        sessionDate: updatedSession.session_date,
+        durationMinutes: updatedSession.duration_minutes
+      })
     }
 
     return updatedSession

@@ -904,7 +904,19 @@ function PatientModal({
     setGeneratingMeetLink(true)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token || ''
+      let session = sessionData.session
+      const now = Math.floor(Date.now() / 1000)
+
+      if (!session || (session.expires_at && session.expires_at - now < 60)) {
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError || !refreshedData.session) {
+          toast.error('Sessão expirada. Faça login novamente.')
+          return
+        }
+        session = refreshedData.session
+      }
+
+      const accessToken = session.access_token || ''
       const payload = patient?.id
         ? { patientId: patient.id, accessToken }
         : { patientName: name, accessToken }
