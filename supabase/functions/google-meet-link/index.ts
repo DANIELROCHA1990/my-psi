@@ -38,6 +38,7 @@ const DEFAULT_LOCAL_OFFSET = '-03:00'
 
 const hasTimezoneInfo = (value: string) => /Z$|[+-]\d{2}:?\d{2}$/.test(value)
 const hasLocalDateTimeShape = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(value)
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 const normalizeOffset = (value?: string | null) => {
   const raw = (value || '').trim()
   if (!raw) return DEFAULT_LOCAL_OFFSET
@@ -144,6 +145,8 @@ serve(async (req) => {
 
   const patientId = typeof body?.patientId === 'string' ? body.patientId.trim() : ''
   const patientNameFromBody = typeof body?.patientName === 'string' ? body.patientName.trim() : ''
+  const patientEmailFromBody = typeof body?.patientEmail === 'string' ? body.patientEmail.trim() : ''
+  const invitePatient = body?.invitePatient === true
   const sessionDateFromBody = typeof body?.sessionDate === 'string' ? body.sessionDate.trim() : ''
   const requestedSessionStartIso = normalizeSessionDate(sessionDateFromBody)
   const requestedDurationMinutes =
@@ -153,6 +156,12 @@ serve(async (req) => {
 
   if (!patientId && !patientNameFromBody) {
     return jsonResponse({ ok: false, error: 'Missing patient info' }, 400)
+  }
+  if (invitePatient && !patientEmailFromBody) {
+    return jsonResponse({ ok: false, error: 'INVITE_EMAIL_REQUIRED' }, 400)
+  }
+  if (invitePatient && !isValidEmail(patientEmailFromBody)) {
+    return jsonResponse({ ok: false, error: 'INVITE_EMAIL_INVALID' }, 400)
   }
 
   const authClient = createClient(supabaseUrl, anonKey, {
@@ -304,23 +313,33 @@ serve(async (req) => {
     eventId: string,
     patientName: string
   ) => {
-    if (!sessionStartIso) {
+    if (!sessionStartIso && !invitePatient) {
       return null
     }
-    const start = new Date(sessionStartIso)
-    const end = new Date(start.getTime() + effectiveDurationMinutes * 60 * 1000)
-    const payload = {
+    const payload: Record<string, unknown> = {
       summary: `Atendimento - ${patientName}`,
       description: `Link fixo de atendimento para ${patientName}.`,
-      start: { dateTime: start.toISOString() },
-      end: { dateTime: end.toISOString() },
       transparency: 'transparent',
       visibility: 'private'
     }
+
+    if (sessionStartIso) {
+      const start = new Date(sessionStartIso)
+      const end = new Date(start.getTime() + effectiveDurationMinutes * 60 * 1000)
+      payload.start = { dateTime: start.toISOString() }
+      payload.end = { dateTime: end.toISOString() }
+    }
+
+    if (invitePatient) {
+      payload.attendees = [{ email: patientEmailFromBody }]
+    }
+
+    const queryParams = new URLSearchParams({ conferenceDataVersion: '1' })
+    if (invitePatient) {
+      queryParams.set('sendUpdates', 'all')
+    }
     const response = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(
-        eventId
-      )}?conferenceDataVersion=1`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?${queryParams.toString()}`,
       {
         method: 'PATCH',
         headers: {
@@ -340,7 +359,7 @@ serve(async (req) => {
     return response.json().catch(() => ({}))
   }
 
-  if (patientRecord?.meet_event_id && sessionStartIso) {
+  if (patientRecord?.meet_event_id && (sessionStartIso || invitePatient)) {
     try {
       const calendarId = patientRecord.meet_calendar_id || 'primary'
       const patientName = patientRecord.full_name || patientNameFromBody || 'Paciente'
@@ -401,9 +420,17 @@ serve(async (req) => {
     sessionStartIso,
     effectiveDurationMinutes
   )
+  if (invitePatient) {
+    ;(eventPayload as Record<string, unknown>).attendees = [{ email: patientEmailFromBody }]
+  }
+
+  const createQueryParams = new URLSearchParams({ conferenceDataVersion: '1' })
+  if (invitePatient) {
+    createQueryParams.set('sendUpdates', 'all')
+  }
 
   let eventResponse = await fetch(
-    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${createQueryParams.toString()}`,
     {
       method: 'POST',
       headers: {
@@ -418,7 +445,7 @@ serve(async (req) => {
     try {
       accessToken = await refreshAccessToken()
       eventResponse = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${createQueryParams.toString()}`,
         {
           method: 'POST',
           headers: {

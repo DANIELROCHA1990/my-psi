@@ -863,6 +863,8 @@ function PatientModal({
   )
   const [loading, setLoading] = useState(false)
   const [generatingMeetLink, setGeneratingMeetLink] = useState(false)
+  const [showMeetInviteModal, setShowMeetInviteModal] = useState(false)
+  const [invitingPatient, setInvitingPatient] = useState(false)
   const [conflictInfo, setConflictInfo] = useState<{
     patientName: string
     nextAvailableStart: Date
@@ -870,6 +872,7 @@ function PatientModal({
   const [closeAfterConflict, setCloseAfterConflict] = useState(false)
   const normalizedCalendarColor = normalizeHexColorValue(formData.calendar_color)
   const calendarColorValid = normalizedCalendarColor ? isValidHexColor(normalizedCalendarColor) : true
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   
   const daysOfWeek = [
     { value: 1, label: 'Segunda-feira' },
@@ -949,6 +952,7 @@ function PatientModal({
         meet_calendar_id: data.calendarId || prev.meet_calendar_id || ''
       }))
       toast.success('Link do Google Meet gerado.')
+      setShowMeetInviteModal(true)
     } catch (err: any) {
       const message = String(err?.message || 'Falha ao gerar link do Google Meet.')
       if (message.toLowerCase().includes('google_not_connected')) {
@@ -958,6 +962,89 @@ function PatientModal({
       }
     } finally {
       setGeneratingMeetLink(false)
+    }
+  }
+
+  const handleInvitePatientToCalendar = async () => {
+    if (invitingPatient) return
+    if (!patient?.id) {
+      toast.error('Salve o paciente antes de enviar convite para a agenda dele.')
+      return
+    }
+
+    const email = (formData.email || '').trim()
+    if (!email) {
+      toast.error('Paciente sem e-mail cadastrado. Preencha o e-mail antes de enviar convite.')
+      return
+    }
+    if (!isValidEmail(email)) {
+      toast.error('E-mail do paciente inválido. Corrija antes de enviar convite.')
+      return
+    }
+
+    const name = (formData.full_name || patient?.full_name || '').trim()
+    if (!name) {
+      toast.error('Nome do paciente não informado.')
+      return
+    }
+
+    setInvitingPatient(true)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      let session = sessionData.session
+      const now = Math.floor(Date.now() / 1000)
+
+      if (!session || (session.expires_at && session.expires_at - now < 60)) {
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError || !refreshedData.session) {
+          toast.error('Sessão expirada. Faça login novamente.')
+          return
+        }
+        session = refreshedData.session
+      }
+
+      const accessToken = session.access_token || ''
+      const payload = { patientId: patient.id, patientEmail: email, invitePatient: true, accessToken }
+
+      const { error } = await supabase.functions.invoke('google-meet-link', {
+        body: payload,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      })
+
+      if (error) {
+        const message = String((error as { message?: string })?.message || '')
+        const normalized = message.toUpperCase()
+        if (normalized.includes('INVITE_EMAIL_REQUIRED')) {
+          toast.error('Paciente sem e-mail cadastrado. Preencha o e-mail antes de enviar convite.')
+          return
+        }
+        if (normalized.includes('INVITE_EMAIL_INVALID')) {
+          toast.error('E-mail do paciente inválido. Corrija antes de enviar convite.')
+          return
+        }
+        if (normalized.includes('GOOGLE_NOT_CONNECTED')) {
+          toast.error('Conecte sua conta Google em Configurações para enviar convites.')
+          return
+        }
+        toast.error((error as { message?: string })?.message || 'Falha ao enviar convite para o paciente.')
+        return
+      }
+
+      toast.success('Convite enviado para a agenda do paciente.')
+      setShowMeetInviteModal(false)
+    } catch (err: any) {
+      const message = String(err?.message || '')
+      if (message.toUpperCase().includes('INVITE_EMAIL_REQUIRED')) {
+        toast.error('Paciente sem e-mail cadastrado. Preencha o e-mail antes de enviar convite.')
+        return
+      }
+      if (message.toUpperCase().includes('INVITE_EMAIL_INVALID')) {
+        toast.error('E-mail do paciente inválido. Corrija antes de enviar convite.')
+        return
+      }
+      toast.error(message || 'Falha ao enviar convite para o paciente.')
+    } finally {
+      setInvitingPatient(false)
     }
   }
   
@@ -1780,6 +1867,40 @@ function PatientModal({
           setCloseAfterConflict(false)
         }}
       />
+      {showMeetInviteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Enviar convite do Google Agenda?</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Deseja adicionar o paciente como convidado no evento para aparecer na agenda dele?
+              </p>
+            </div>
+            <div className="p-6 space-y-2">
+              <p className="text-sm text-gray-700">
+                E-mail atual do paciente: <span className="font-medium">{formData.email || 'não cadastrado'}</span>
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowMeetInviteModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Agora não
+              </button>
+              <button
+                type="button"
+                onClick={handleInvitePatientToCalendar}
+                disabled={invitingPatient}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-60"
+              >
+                {invitingPatient ? 'Enviando...' : 'Enviar convite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
