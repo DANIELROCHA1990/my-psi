@@ -1,15 +1,61 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { authService } from '../../services/authService'
-import { Brain, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Brain, Mail, Lock, Eye, EyeOff, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[]
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
 
 export default function AuthForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installing, setInstalling] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setInstallPrompt(event as BeforeInstallPromptEvent)
+    }
+
+    const handleAppInstalled = () => {
+      setInstallPrompt(null)
+      toast.success('MyPsi instalado com sucesso')
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt || installing) return
+
+    try {
+      setInstalling(true)
+      await installPrompt.prompt()
+      const result = await installPrompt.userChoice
+      if (result.outcome === 'accepted') {
+        toast.success('Instalacao iniciada')
+        setInstallPrompt(null)
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Nao foi possivel abrir o instalador')
+    } finally {
+      setInstalling(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,14 +154,27 @@ export default function AuthForm() {
               </button>
             </div>
           </form>
+
+          {installPrompt && (
+            <button
+              type="button"
+              onClick={handleInstall}
+              disabled={installing}
+              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              {installing ? 'Abrindo instalador...' : 'Instalar MyPsi'}
+            </button>
+          )}
+
           <div className="mt-6 text-center text-xs text-gray-500">
-            Ao continuar, você concorda com nossos{' '}
+            Ao continuar, voce concorda com nossos{' '}
             <a href="/termos" className="text-emerald-700 hover:text-emerald-800 underline">
-              Termos de Serviço
+              Termos de Servico
             </a>{' '}
             e{' '}
             <a href="/privacidade" className="text-emerald-700 hover:text-emerald-800 underline">
-              Política de Privacidade
+              Politica de Privacidade
             </a>.
           </div>
         </div>

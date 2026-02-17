@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="MyPsi">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#g)"/>
+  <circle cx="96" cy="96" r="56" fill="#ecfdf5" opacity="0.95"/>
+  <path d="M74 70h13l9 16 9-16h13v52h-12V91l-8 14h-4l-8-14v31H74z" fill="#065f46"/>
+</svg>
