@@ -34,8 +34,17 @@ class GoogleAuthError extends Error {
 const isMeetLink = (link?: string | null) => Boolean(link && link.includes('meet.google.com/'))
 
 const DEFAULT_EVENT_DURATION_MINUTES = 60
+const DEFAULT_LOCAL_OFFSET = '-03:00'
 
 const hasTimezoneInfo = (value: string) => /Z$|[+-]\d{2}:?\d{2}$/.test(value)
+const hasLocalDateTimeShape = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(value)
+const normalizeOffset = (value?: string | null) => {
+  const raw = (value || '').trim()
+  if (!raw) return DEFAULT_LOCAL_OFFSET
+  if (/^[+-]\d{2}:\d{2}$/.test(raw)) return raw
+  if (/^[+-]\d{2}\d{2}$/.test(raw)) return `${raw.slice(0, 3)}:${raw.slice(3)}`
+  return DEFAULT_LOCAL_OFFSET
+}
 
 const normalizeSessionDate = (value?: string | null): string | null => {
   if (!value) {
@@ -45,7 +54,17 @@ const normalizeSessionDate = (value?: string | null): string | null => {
   if (!trimmed) {
     return null
   }
-  const parsed = hasTimezoneInfo(trimmed) ? new Date(trimmed) : new Date(trimmed)
+
+  let parsed: Date
+  if (hasTimezoneInfo(trimmed)) {
+    parsed = new Date(trimmed)
+  } else if (hasLocalDateTimeShape(trimmed)) {
+    const localOffset = normalizeOffset(getEnv('APP_TIMEZONE'))
+    parsed = new Date(`${trimmed}${localOffset}`)
+  } else {
+    parsed = new Date(trimmed)
+  }
+
   if (Number.isNaN(parsed.getTime())) {
     return null
   }
@@ -228,6 +247,8 @@ serve(async (req) => {
     meet_event_id: string | null
     meet_calendar_id: string | null
   } | null = null
+  let sessionStartIso = requestedSessionStartIso
+  let effectiveDurationMinutes = requestedDurationMinutes
 
   if (patientId) {
     const { data: patientData, error: patientError } = await adminClient
@@ -242,7 +263,33 @@ serve(async (req) => {
 
     patientRecord = patientData
 
-    if (isMeetLink(patientRecord.session_link) && !requestedSessionStartIso) {
+    if (!sessionStartIso) {
+      const { data: nextSession } = await adminClient
+        .from('sessions')
+        .select('session_date, duration_minutes')
+        .eq('patient_id', patientId)
+        .neq('payment_status', 'cancelled')
+        .gte('session_date', new Date().toISOString())
+        .order('session_date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      const nextSessionDate =
+        typeof nextSession?.session_date === 'string' ? nextSession.session_date : null
+      const normalizedNextSessionDate = normalizeSessionDate(nextSessionDate)
+      if (normalizedNextSessionDate) {
+        sessionStartIso = normalizedNextSessionDate
+        if (
+          typeof nextSession?.duration_minutes === 'number' &&
+          Number.isFinite(nextSession.duration_minutes) &&
+          nextSession.duration_minutes > 0
+        ) {
+          effectiveDurationMinutes = Math.round(nextSession.duration_minutes)
+        }
+      }
+    }
+
+    if (isMeetLink(patientRecord.session_link) && !sessionStartIso) {
       return jsonResponse({
         ok: true,
         link: patientRecord.session_link,
@@ -257,11 +304,11 @@ serve(async (req) => {
     eventId: string,
     patientName: string
   ) => {
-    if (!requestedSessionStartIso) {
+    if (!sessionStartIso) {
       return null
     }
-    const start = new Date(requestedSessionStartIso)
-    const end = new Date(start.getTime() + requestedDurationMinutes * 60 * 1000)
+    const start = new Date(sessionStartIso)
+    const end = new Date(start.getTime() + effectiveDurationMinutes * 60 * 1000)
     const payload = {
       summary: `Atendimento - ${patientName}`,
       description: `Link fixo de atendimento para ${patientName}.`,
@@ -293,7 +340,7 @@ serve(async (req) => {
     return response.json().catch(() => ({}))
   }
 
-  if (patientRecord?.meet_event_id && requestedSessionStartIso) {
+  if (patientRecord?.meet_event_id && sessionStartIso) {
     try {
       const calendarId = patientRecord.meet_calendar_id || 'primary'
       const patientName = patientRecord.full_name || patientNameFromBody || 'Paciente'
@@ -351,8 +398,8 @@ serve(async (req) => {
   const patientName = patientRecord?.full_name || patientNameFromBody || 'Paciente'
   const eventPayload = buildCalendarEventPayload(
     patientName,
-    requestedSessionStartIso,
-    requestedDurationMinutes
+    sessionStartIso,
+    effectiveDurationMinutes
   )
 
   let eventResponse = await fetch(

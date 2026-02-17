@@ -105,6 +105,53 @@ const syncPatientMeetEventDate = async (params: {
   }
 }
 
+const syncPatientMeetWithNextUpcomingSession = async (patientId: string) => {
+  try {
+    const { data: patientData, error: patientError } = await supabase
+      .from('patients')
+      .select('session_link')
+      .eq('id', patientId)
+      .maybeSingle()
+
+    if (patientError) {
+      console.error('Erro ao verificar link do paciente para sincronizar Meet:', patientError)
+      return
+    }
+
+    if (!isMeetLink(patientData?.session_link)) {
+      return
+    }
+
+    const nowIso = new Date().toISOString()
+    const { data: nextSession, error: nextSessionError } = await supabase
+      .from('sessions')
+      .select('session_date, duration_minutes')
+      .eq('patient_id', patientId)
+      .neq('payment_status', 'cancelled')
+      .gte('session_date', nowIso)
+      .order('session_date', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (nextSessionError) {
+      console.error('Erro ao buscar próxima sessão para sincronizar Meet:', nextSessionError)
+      return
+    }
+
+    if (!nextSession?.session_date) {
+      return
+    }
+
+    await syncPatientMeetEventDate({
+      patientId,
+      sessionDate: nextSession.session_date,
+      durationMinutes: nextSession.duration_minutes
+    })
+  } catch (error) {
+    console.error('Erro ao sincronizar Meet com próxima sessão:', error)
+  }
+}
+
 const isMeetLink = (value?: string | null) => Boolean(value && value.includes('meet.google.com/'))
 
 const fetchSessions = async (): Promise<Session[]> => {
@@ -606,6 +653,8 @@ export const sessionService = {
     if (error) {
       throw new Error(`Failed to create multiple sessions: ${error.message}`)
     }
+
+    await syncPatientMeetWithNextUpcomingSession(patientId)
 
     return data || []
   },
