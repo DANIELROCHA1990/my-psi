@@ -25,7 +25,7 @@ const loadFirebaseScripts = () => {
 }
 
 const firebaseLoaded = loadFirebaseScripts()
-const APP_CACHE = 'mypsi-app-cache-v1'
+const APP_CACHE = 'mypsi-app-cache-v2'
 const APP_SHELL_FILES = [
   '/',
   '/index.html',
@@ -75,28 +75,32 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached
-      }
-
-      return fetch(event.request)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response
-          }
-
           const copy = response.clone()
-          caches.open(APP_CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined)
+          caches.open(APP_CACHE).then((cache) => cache.put('/index.html', copy)).catch(() => undefined)
           return response
         })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html')
-          }
-          return undefined
-        })
+        .catch(() => caches.match('/index.html'))
+    )
+    return
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached
+
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response
+        }
+
+        const copy = response.clone()
+        caches.open(APP_CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined)
+        return response
+      })
     })
   )
 })

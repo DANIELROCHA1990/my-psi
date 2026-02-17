@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { profileService } from '../services/profileService'
@@ -118,14 +118,14 @@ export default function Settings() {
         .maybeSingle()
 
       if (error) {
-        console.error('Erro ao carregar conexÃ£o Google:', error)
+        console.error('Erro ao carregar conexão Google:', error)
         setGoogleConnection(null)
         return
       }
 
       setGoogleConnection(data || null)
     } catch (error) {
-      console.error('Erro ao carregar conexÃ£o Google:', error)
+      console.error('Erro ao carregar conexão Google:', error)
       setGoogleConnection(null)
     } finally {
       setLoadingGoogle(false)
@@ -184,7 +184,7 @@ export default function Settings() {
     if (!normalized.includes('refresh token') && !normalized.includes('jwt')) {
       return false
     }
-    toast.error('Sessão expirada. Faça login novamente.')
+    toast.error('SessÃ£o expirada. FaÃ§a login novamente.')
     await authService.signOut()
     navigate('/auth')
     return true
@@ -235,20 +235,20 @@ export default function Settings() {
       })
 
       if (error) {
-        toast.error('Falha ao iniciar conexÃ£o com o Google')
+        toast.error('Falha ao iniciar conexão com o Google')
         return
       }
 
       const url = data?.url
       if (!url || typeof url !== 'string') {
-        toast.error('URL de conexÃ£o nÃ£o retornada')
+        toast.error('URL de conexão não retornada')
         return
       }
 
       window.location.assign(url)
     } catch (error) {
       console.error('Erro ao conectar Google:', error)
-      toast.error('Falha ao iniciar conexÃ£o com o Google')
+      toast.error('Falha ao iniciar conexão com o Google')
     } finally {
       setGoogleBusy(false)
     }
@@ -327,7 +327,7 @@ export default function Settings() {
       }
       const message = String(error?.message || '')
       if (message.toLowerCase().includes('logo_data') || message.toLowerCase().includes('column')) {
-        toast.error('Coluna logo_data não existe no banco. Crie a coluna e tente novamente.')
+        toast.error('Coluna logo_data nÃ£o existe no banco. Crie a coluna e tente novamente.')
         return
       }
       toast.error(message || 'Erro ao salvar perfil')
@@ -340,7 +340,7 @@ export default function Settings() {
     e.preventDefault()
     
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('As senhas não coincidem')
+      toast.error('As senhas nÃ£o coincidem')
       return
     }
 
@@ -381,7 +381,7 @@ export default function Settings() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e preferencias.</p>
+        <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e preferências.</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -424,7 +424,7 @@ export default function Settings() {
             >
               <div className="flex items-center gap-2">
                 <Link2 className="h-4 w-4" />
-                IntegraÃ§Ãµes
+                Integrações
               </div>
             </button>
           </nav>
@@ -782,7 +782,7 @@ export default function Settings() {
                         Conectado{googleConnection.email ? ` como ${googleConnection.email}` : ''}.
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">NÃ£o conectado.</p>
+                      <p className="text-xs text-gray-500 mt-2">não conectado.</p>
                     )}
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -816,7 +816,3 @@ export default function Settings() {
     </div>
   )
 }
-
-
-
-
