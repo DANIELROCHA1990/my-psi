@@ -58,6 +58,7 @@ export interface Patient {
 export interface SessionSchedule {
   dayOfWeek: number // 0 = domingo, 1 = segunda, etc.
   time: string // formato HH:mm
+  startDate?: string // formato yyyy-MM-dd para a primeira sessão
   paymentStatus: 'paid' | 'pending'
   sessionType?: string
   durationMinutes?: number

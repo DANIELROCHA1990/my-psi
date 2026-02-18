@@ -870,6 +870,12 @@ function PatientModal({
     nextAvailableStart: Date
   } | null>(null)
   const [closeAfterConflict, setCloseAfterConflict] = useState(false)
+  const [firstSessionModal, setFirstSessionModal] = useState<{
+    scheduleIndex: number
+    dayOfWeek: number
+  } | null>(null)
+  const [firstSessionDateInput, setFirstSessionDateInput] = useState('')
+  const [firstSessionDateError, setFirstSessionDateError] = useState('')
   const normalizedCalendarColor = normalizeHexColorValue(formData.calendar_color)
   const calendarColorValid = normalizedCalendarColor ? isValidHexColor(normalizedCalendarColor) : true
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -1066,10 +1072,85 @@ function PatientModal({
     setSessionSchedules(updated)
   }
 
+  const requiresFirstSessionDate = (frequency: string) => (
+    frequency === 'weekly' || frequency === 'biweekly'
+  )
+
+  const getTodayLocalDateInput = () => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const getScheduleStartDateLabel = (startDate?: string) => {
+    if (!startDate) {
+      return 'Selecionar data'
+    }
+    const parsedStartDate = parseISO(startDate)
+    if (Number.isNaN(parsedStartDate.getTime())) {
+      return 'Selecionar data'
+    }
+    return format(parsedStartDate, 'dd/MM/yyyy')
+  }
+
+  const openFirstSessionDateModal = (index: number, dayOfWeek: number) => {
+    const currentStartDate = sessionSchedules[index]?.startDate || ''
+    const parsedCurrentStart = currentStartDate ? parseISO(currentStartDate) : null
+    const inputDate = parsedCurrentStart && !Number.isNaN(parsedCurrentStart.getTime()) && parsedCurrentStart.getDay() === dayOfWeek
+      ? currentStartDate
+      : ''
+    setFirstSessionDateInput(inputDate)
+    setFirstSessionDateError('')
+    setFirstSessionModal({
+      scheduleIndex: index,
+      dayOfWeek
+    })
+  }
+
+  const handleScheduleDayChange = (index: number, dayOfWeek: number) => {
+    updateSchedule(index, 'dayOfWeek', dayOfWeek)
+    if (requiresFirstSessionDate(formData.session_frequency)) {
+      openFirstSessionDateModal(index, dayOfWeek)
+    }
+  }
+
+  const closeFirstSessionDateModal = () => {
+    setFirstSessionModal(null)
+    setFirstSessionDateInput('')
+    setFirstSessionDateError('')
+  }
+
+  const applyFirstSessionDate = () => {
+    if (!firstSessionModal) {
+      return
+    }
+    if (!firstSessionDateInput) {
+      const message = 'Selecione a data da primeira sessão.'
+      setFirstSessionDateError(message)
+      toast.error(message)
+      return
+    }
+
+    const selectedDate = parseISO(firstSessionDateInput)
+    if (Number.isNaN(selectedDate.getTime()) || selectedDate.getDay() !== firstSessionModal.dayOfWeek) {
+      const dayLabel = daysOfWeek.find((day) => day.value === firstSessionModal.dayOfWeek)?.label || 'dia selecionado'
+      const message = `Escolha uma data que caia em ${dayLabel}.`
+      setFirstSessionDateError(message)
+      toast.error('Escolha um dia da semana válido para a primeira sessão.')
+      return
+    }
+
+    updateSchedule(firstSessionModal.scheduleIndex, 'startDate', firstSessionDateInput)
+    closeFirstSessionDateModal()
+  }
+
   const normalizeSchedulesForCompare = (schedules: SessionSchedule[]) => {
     return schedules.map(schedule => ({
       dayOfWeek: schedule.dayOfWeek,
       time: schedule.time,
+      startDate: schedule.startDate || null,
       paymentStatus: schedule.paymentStatus,
       sessionType: schedule.sessionType || null,
       durationMinutes: schedule.durationMinutes ?? null,
@@ -1110,19 +1191,37 @@ function PatientModal({
       if (Number.isNaN(hours) || Number.isNaN(minutes)) {
         return
       }
-      const baseDate = new Date(nowLocal)
-      baseDate.setHours(hours, minutes, 0, 0)
+      let firstSessionDateLocal: Date | null = null
 
-      const currentDay = baseDate.getDay()
-      let daysToAdd = schedule.dayOfWeek - currentDay
-      if (daysToAdd < 0) {
-        daysToAdd += 7
-      }
-      if (daysToAdd === 0 && baseDate < nowLocal) {
-        daysToAdd = 7
+      if (schedule.startDate) {
+        const parsedStartDate = parseISO(schedule.startDate)
+        if (!Number.isNaN(parsedStartDate.getTime()) && parsedStartDate.getDay() === schedule.dayOfWeek) {
+          parsedStartDate.setHours(hours, minutes, 0, 0)
+          firstSessionDateLocal = parsedStartDate
+        }
       }
 
-      const firstSessionDateLocal = addDays(baseDate, daysToAdd)
+      if (!firstSessionDateLocal) {
+        const baseDate = new Date(nowLocal)
+        baseDate.setHours(hours, minutes, 0, 0)
+
+        const currentDay = baseDate.getDay()
+        let daysToAdd = schedule.dayOfWeek - currentDay
+        if (daysToAdd < 0) {
+          daysToAdd += 7
+        }
+        if (daysToAdd === 0 && baseDate < nowLocal) {
+          daysToAdd = 7
+        }
+
+        firstSessionDateLocal = addDays(baseDate, daysToAdd)
+      }
+
+      if (intervalWeeks > 0) {
+        while (firstSessionDateLocal < nowLocal) {
+          firstSessionDateLocal = addWeeks(firstSessionDateLocal, intervalWeeks)
+        }
+      }
 
       for (let occurrence = 0; occurrence < occurrences; occurrence++) {
         const sessionDateLocal = intervalWeeks === 0
@@ -1210,6 +1309,29 @@ function PatientModal({
     if (!calendarColorValid) {
       toast.error('Cor invalida. Use #RGB ou #RRGGBB.')
       return
+    }
+    if (manageAutoSessions && sessionSchedules.length > 0 && requiresFirstSessionDate(formData.session_frequency)) {
+      const invalidScheduleIndex = sessionSchedules.findIndex((schedule) => {
+        if (!schedule.startDate) {
+          return true
+        }
+        const parsedStartDate = parseISO(schedule.startDate)
+        if (Number.isNaN(parsedStartDate.getTime())) {
+          return true
+        }
+        return parsedStartDate.getDay() !== schedule.dayOfWeek
+      })
+
+      if (invalidScheduleIndex >= 0) {
+        const invalidSchedule = sessionSchedules[invalidScheduleIndex]
+        if (invalidSchedule.startDate) {
+          toast.error('Escolha um dia da semana válido para a primeira sessão.')
+        } else {
+          toast.error('Defina a data da primeira sessão antes de salvar.')
+        }
+        openFirstSessionDateModal(invalidScheduleIndex, invalidSchedule.dayOfWeek)
+        return
+      }
     }
     
     setLoading(true)
@@ -1765,14 +1887,17 @@ function PatientModal({
                 </p>
                 
                 {sessionSchedules.map((schedule, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg">
+                  <div
+                    key={index}
+                    className={`grid grid-cols-1 ${requiresFirstSessionDate(formData.session_frequency) ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-4 border border-gray-200 rounded-lg`}
+                  >
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Dia da Semana
                       </label>
                       <select
                         value={schedule.dayOfWeek}
-                        onChange={(e) => updateSchedule(index, 'dayOfWeek', Number(e.target.value))}
+                        onChange={(e) => handleScheduleDayChange(index, Number(e.target.value))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                       >
                         {daysOfWeek.map(day => (
@@ -1794,6 +1919,20 @@ function PatientModal({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
+                    {requiresFirstSessionDate(formData.session_frequency) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Primeira Sessão
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => openFirstSessionDateModal(index, schedule.dayOfWeek)}
+                          className="w-full px-3 py-2 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 hover:bg-gray-50 transition-colors"
+                        >
+                          {getScheduleStartDateLabel(schedule.startDate)}
+                        </button>
+                      </div>
+                    )}
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1896,6 +2035,54 @@ function PatientModal({
                 className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-60"
               >
                 {invitingPatient ? 'Enviando...' : 'Enviar convite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {firstSessionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Primeira sessão</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Escolha a data da primeira sessão para {daysOfWeek.find((day) => day.value === firstSessionModal.dayOfWeek)?.label?.toLowerCase() || 'o dia selecionado'}.
+              </p>
+            </div>
+            <div className="p-6 space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Data
+              </label>
+              <input
+                type="date"
+                value={firstSessionDateInput}
+                min={getTodayLocalDateInput()}
+                onChange={(e) => {
+                  setFirstSessionDateInput(e.target.value)
+                  if (firstSessionDateError) {
+                    setFirstSessionDateError('')
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+              {firstSessionDateError && (
+                <p className="text-sm text-red-600">{firstSessionDateError}</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={closeFirstSessionDateModal}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={applyFirstSessionDate}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                Confirmar
               </button>
             </div>
           </div>

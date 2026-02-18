@@ -560,19 +560,37 @@ export const sessionService = {
     
     for (const schedule of schedules) {
       const [hours, minutes] = schedule.time.split(':').map(Number)
-      const baseDate = new Date(nowLocal)
-      baseDate.setHours(hours, minutes, 0, 0)
+      let firstSessionDateLocal: Date | null = null
 
-      const currentDay = baseDate.getDay()
-      let daysToAdd = schedule.dayOfWeek - currentDay
-      if (daysToAdd < 0) {
-        daysToAdd += 7
-      }
-      if (daysToAdd === 0 && baseDate < nowLocal) {
-        daysToAdd = 7
+      if (schedule.startDate) {
+        const parsedStartDate = parseISO(schedule.startDate)
+        if (!Number.isNaN(parsedStartDate.getTime()) && parsedStartDate.getDay() === schedule.dayOfWeek) {
+          parsedStartDate.setHours(hours, minutes, 0, 0)
+          firstSessionDateLocal = parsedStartDate
+        }
       }
 
-      const firstSessionDateLocal = addDays(baseDate, daysToAdd)
+      if (!firstSessionDateLocal) {
+        const baseDate = new Date(nowLocal)
+        baseDate.setHours(hours, minutes, 0, 0)
+
+        const currentDay = baseDate.getDay()
+        let daysToAdd = schedule.dayOfWeek - currentDay
+        if (daysToAdd < 0) {
+          daysToAdd += 7
+        }
+        if (daysToAdd === 0 && baseDate < nowLocal) {
+          daysToAdd = 7
+        }
+
+        firstSessionDateLocal = addDays(baseDate, daysToAdd)
+      }
+
+      if (intervalWeeks > 0) {
+        while (firstSessionDateLocal < nowLocal) {
+          firstSessionDateLocal = addWeeks(firstSessionDateLocal, intervalWeeks)
+        }
+      }
 
       for (let occurrence = 0; occurrence < occurrences; occurrence++) {
         const sessionDateLocal = intervalWeeks === 0
