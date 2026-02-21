@@ -19,7 +19,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import { supabase } from './lib/supabase'
 import { listenForForegroundMessages } from './lib/pushSubscription'
-import { Eye, EyeOff, Lock } from 'lucide-react'
+import { Eye, EyeOff, Lock } from './lib/icons'
 
 export default function App() {
   const { user, loading } = useAuth()

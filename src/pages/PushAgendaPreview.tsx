@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calendar as CalendarIcon, Clock } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock } from '../lib/icons'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 

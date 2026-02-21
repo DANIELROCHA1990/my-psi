@@ -14,7 +14,7 @@ import {
   AlertCircle,
   FileText,
   Link2
-} from 'lucide-react'
+} from '../lib/icons'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'

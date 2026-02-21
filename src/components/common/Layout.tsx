@@ -18,7 +18,7 @@ import {
   ChevronRight,
   Moon,
   Sun
-} from 'lucide-react'
+} from '../../lib/icons'
 import toast from 'react-hot-toast'
 
 interface LayoutProps {

@@ -1,7 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Download, Eye, Folder as FolderIcon, FolderPlus, Italic, Link2, Plus, Save, Trash2, Underline } from 'lucide-react'
+import {
+  ArrowLeft,
+  Eye,
+  FilePdf,
+  FloppyDisk,
+  Folder,
+  FolderPlus,
+  LinkSimple,
+  Plus,
+  TextAlignCenter,
+  TextAlignJustify,
+  TextAlignLeft,
+  TextAlignRight,
+  TextB,
+  TextItalic,
+  TextUnderline,
+  Trash
+} from '@phosphor-icons/react'
 import toast from 'react-hot-toast'
 import { patientService } from '../../services/patientService'
 import { documentService } from '../../services/documentService'
@@ -94,6 +111,7 @@ export default function DocumentsTab() {
   const [selectedFolderViewId, setSelectedFolderViewId] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewFileName, setPreviewFileName] = useState('documento.pdf')
+  const [fontSize, setFontSize] = useState('14')
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [statsCache, setStatsCache] = useState<Record<string, { total: number; paid: number; pending: number }>>({})
 
@@ -230,6 +248,18 @@ export default function DocumentsTab() {
     if (!folderId) return
     editorRef.current?.focus()
     document.execCommand(command, false, value)
+    syncEditorContent()
+  }
+
+  const applyFontSize = (sizePx: string) => {
+    if (!folderId || !editorRef.current) return
+    setFontSize(sizePx)
+    editorRef.current.focus()
+    document.execCommand('fontSize', false, '7')
+    editorRef.current.innerHTML = editorRef.current.innerHTML.replace(
+      /<font size="7">([\s\S]*?)<\/font>/gi,
+      `<span style="font-size:${sizePx}px">$1</span>`
+    )
     syncEditorContent()
   }
 
@@ -411,7 +441,7 @@ export default function DocumentsTab() {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Pastas</h3>
             <div className="mt-2 flex gap-2">
               <input value={folderName} onChange={(e) => setFolderName(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-lg text-sm" placeholder="Nome da pasta" />
-              <button type="button" onClick={createFolder} className="px-3 py-2 bg-emerald-600 text-white rounded-lg"><FolderPlus className="h-4 w-4" /></button>
+              <button type="button" onClick={createFolder} className="px-3 py-2 bg-emerald-600 text-white rounded-lg"><FolderPlus size={16} weight="bold" /></button>
             </div>
             {!selectedFolderViewId ? (
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -425,7 +455,7 @@ export default function DocumentsTab() {
                       className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900/30 px-3 py-3 text-left"
                     >
                       <div className="flex items-start gap-2">
-                        <FolderIcon className="h-4 w-4 text-amber-500 mt-0.5" />
+                        <Folder size={16} weight="duotone" className="text-amber-500 mt-0.5" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">{folder.name}</p>
                           <p className="text-xs text-gray-500 dark:text-slate-400">{total} documento(s)</p>
@@ -446,7 +476,10 @@ export default function DocumentsTab() {
                     onClick={() => setSelectedFolderViewId('')}
                     className="text-xs px-2 py-1 border border-gray-300 dark:border-slate-600 rounded text-gray-700 dark:text-slate-200"
                   >
-                    Voltar
+                    <span className="inline-flex items-center gap-1">
+                      <ArrowLeft size={14} weight="bold" />
+                      Voltar
+                    </span>
                   </button>
                   <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{selectedFolderName}</p>
                   <button
@@ -458,7 +491,7 @@ export default function DocumentsTab() {
                     }}
                     className="inline-flex items-center gap-1 text-xs border border-emerald-300 text-emerald-700 px-2 py-1 rounded"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus size={12} weight="bold" />
                     Novo
                   </button>
                 </div>
@@ -472,10 +505,10 @@ export default function DocumentsTab() {
                         {(assignmentsByTemplate[t.id] || []).map(a => <span key={a.id} className="text-[11px] px-2 py-1 border border-gray-200 dark:border-slate-600 rounded-full text-gray-700 dark:text-slate-300">{a.patients?.full_name || 'Paciente'}</span>)}
                       </div>
                       <div className="mt-2 flex gap-2">
-                        <button type="button" title="Atribuir" aria-label="Atribuir" onClick={() => openPatientModal('assign', t.id)} className="h-8 w-8 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><Link2 className="h-3.5 w-3.5" /></button>
-                        <button type="button" title="Gerar PDF" aria-label="Gerar PDF" onClick={() => openPatientModal('generate', t.id)} className="h-8 w-8 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><Download className="h-3.5 w-3.5" /></button>
-                        <button type="button" title="Previsualizar" aria-label="Previsualizar" onClick={() => openPatientModal('preview', t.id)} className="h-8 w-8 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><Eye className="h-3.5 w-3.5" /></button>
-                        <button type="button" title="Excluir" aria-label="Excluir" onClick={() => deleteTemplate(t)} className="h-8 w-8 border border-red-200 text-red-600 rounded inline-flex items-center justify-center"><Trash2 className="h-3.5 w-3.5" /></button>
+                        <button type="button" title="Atribuir ao paciente" aria-label="Atribuir ao paciente" onClick={() => openPatientModal('assign', t.id)} className="h-9 w-9 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><LinkSimple size={16} weight="bold" /></button>
+                        <button type="button" title="Exportar PDF" aria-label="Exportar PDF" onClick={() => openPatientModal('generate', t.id)} className="h-9 w-9 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><FilePdf size={16} weight="fill" /></button>
+                        <button type="button" title="Previsualizar arquivo" aria-label="Previsualizar arquivo" onClick={() => openPatientModal('preview', t.id)} className="h-9 w-9 border border-gray-300 dark:border-slate-600 rounded inline-flex items-center justify-center text-gray-700 dark:text-slate-300"><Eye size={16} weight="duotone" /></button>
+                        <button type="button" title="Excluir documento" aria-label="Excluir documento" onClick={() => deleteTemplate(t)} className="h-9 w-9 border border-red-200 text-red-600 rounded inline-flex items-center justify-center"><Trash size={16} weight="bold" /></button>
                       </div>
                     </div>
                   ))}
@@ -506,31 +539,45 @@ export default function DocumentsTab() {
                 <option value="">Escolha uma pasta</option>
                 {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
-              <button type="button" onClick={saveTemplate} disabled={saving} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm"><Save className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar'}</button>
+              <button type="button" onClick={saveTemplate} disabled={saving} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm"><FloppyDisk size={16} weight="bold" />{saving ? 'Salvando...' : 'Salvar'}</button>
             </div>
             <div className="mt-3 rounded-lg border border-gray-300 dark:border-slate-600 overflow-hidden">
               <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 p-2 text-gray-700 dark:text-slate-200">
+                <select
+                  value={fontSize}
+                  onChange={(e) => applyFontSize(e.target.value)}
+                  className="mr-2 h-8 px-2 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-950 dark:text-slate-100"
+                  title="Tamanho da fonte"
+                >
+                  <option value="12">12</option>
+                  <option value="14">14</option>
+                  <option value="16">16</option>
+                  <option value="18">18</option>
+                  <option value="20">20</option>
+                  <option value="24">24</option>
+                  <option value="28">28</option>
+                </select>
                 <button type="button" onClick={() => execEditor('bold')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Negrito">
-                  <Bold className="h-4 w-4" />
+                  <TextB size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => execEditor('italic')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Italico">
-                  <Italic className="h-4 w-4" />
+                  <TextItalic size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => execEditor('underline')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Sublinhado">
-                  <Underline className="h-4 w-4" />
+                  <TextUnderline size={16} weight="bold" />
                 </button>
                 <span className="mx-1 h-6 w-px bg-gray-300 dark:bg-slate-600" />
                 <button type="button" onClick={() => execEditor('justifyLeft')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Alinhar a esquerda">
-                  <AlignLeft className="h-4 w-4" />
+                  <TextAlignLeft size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => execEditor('justifyCenter')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Centralizar">
-                  <AlignCenter className="h-4 w-4" />
+                  <TextAlignCenter size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => execEditor('justifyRight')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Alinhar a direita">
-                  <AlignRight className="h-4 w-4" />
+                  <TextAlignRight size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => execEditor('justifyFull')} className="p-2 rounded hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-600" title="Justificar">
-                  <AlignJustify className="h-4 w-4" />
+                  <TextAlignJustify size={16} weight="bold" />
                 </button>
               </div>
               <div

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { authService } from '../../services/authService'
-import { Brain, Mail, Lock, Eye, EyeOff, Download } from 'lucide-react'
+import { Brain, Mail, Lock, Eye, EyeOff, Download } from '../../lib/icons'
 import toast from 'react-hot-toast'
 
 interface BeforeInstallPromptEvent extends Event {

@@ -2,7 +2,7 @@
 import { sessionService } from '../services/sessionService'
 import { patientService } from '../services/patientService'
 import { Session, Patient } from '../types'
-import { Plus, Search, Edit, Calendar, Clock, DollarSign, FileText, CalendarClock, XCircle } from 'lucide-react'
+import { Plus, Search, Edit, Calendar, Clock, DollarSign, FileText, CalendarClock, XCircle } from '../lib/icons'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'

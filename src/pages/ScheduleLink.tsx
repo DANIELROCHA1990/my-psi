@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calendar as CalendarIcon, Clock, Copy, CheckCircle } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, Copy, CheckCircle } from '../lib/icons'
 import { addMinutes, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
