@@ -101,3 +101,30 @@ export interface FinancialRecord {
   sessions?: Session
 }
 
+export interface DocumentFolder {
+  id: string
+  user_id: string
+  name: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface DocumentTemplate {
+  id: string
+  user_id: string
+  folder_id?: string | null
+  title: string
+  content: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface DocumentTemplateAssignment {
+  id: string
+  user_id: string
+  template_id: string
+  patient_id: string
+  created_at?: string
+  patients?: Pick<Patient, 'id' | 'full_name'>
+}
+
