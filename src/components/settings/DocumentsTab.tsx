@@ -88,7 +88,7 @@ const buildNewDocumentHtml = (profile?: Profile | null) => {
     '<div style="text-align:center;">{{assinatura_usuario}}</div>',
     '<div style="text-align:center;">_____________________________________________</div>',
     `<div style="text-align:center;">${escapeHtml(name)}</div>`,
-    `<div style="text-align:center;">${escapeHtml(crp)}</div>`
+    `<div style="text-align:center;margin-top:4px;line-height:1.6;">${escapeHtml(crp)}</div>`
   ].join('')
 }
 
@@ -327,9 +327,9 @@ export default function DocumentsTab() {
     const replaced = replaceVars(template.content || '', values)
     const bodyHtml = /<[a-z][\s\S]*>/i.test(replaced) ? replaced : toHtml(replaced)
     const logoHtml = profile?.logo_data
-      ? `<div style="margin-bottom:16px;"><img src="${profile.logo_data}" alt="Logo" style="max-width:120px;max-height:70px;object-fit:contain;" /></div>`
+      ? `<div style="margin-bottom:16px;text-align:center;"><img src="${profile.logo_data}" alt="Logo" style="display:inline-block;max-width:120px;max-height:70px;object-fit:contain;" /></div>`
       : ''
-    const renderHtml = `<div style="font-family:Arial,sans-serif;font-size:12px;line-height:1.5;color:#111;">${logoHtml}${bodyHtml}</div>`
+    const renderHtml = `<div style="font-family:Arial,sans-serif;font-size:12px;line-height:1.55;color:#111;padding-bottom:24px;box-sizing:border-box;">${logoHtml}${bodyHtml}</div>`
 
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
     const margin = 40
