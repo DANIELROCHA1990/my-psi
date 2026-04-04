@@ -12,6 +12,7 @@ import Sessions from './pages/Sessions'
 import Calendar from './pages/Calendar'
 import Financial from './pages/Financial'
 import Settings from './pages/Settings'
+import MedicalRecords from './pages/MedicalRecords'
 import Notifications from './pages/Notifications'
 import PushAgendaPreview from './pages/PushAgendaPreview'
 import ScheduleLink from './pages/ScheduleLink'
@@ -131,6 +132,7 @@ export default function App() {
                   <Route path="/sessions" element={<Sessions />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/financial" element={<Financial />} />
+                  <Route path="/medical-records" element={<MedicalRecords />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

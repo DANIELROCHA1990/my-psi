@@ -359,10 +359,61 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+[functions.audit-medical-access]
+verify_jwt = false
+
+[functions.create-medical-entry]
+verify_jwt = false
+
+[functions.create-medical-record]
+verify_jwt = false
+
+[functions.export-medical-record]
+verify_jwt = false
+
+[functions.generate-medical-document-pdf]
+verify_jwt = false
+
+[functions.get-medical-attachment-url]
+verify_jwt = false
+
+[functions.get-medical-record]
+verify_jwt = false
+
+[functions.google-meet-link]
+verify_jwt = false
+
+[functions.google-oauth-callback]
+verify_jwt = false
+
+[functions.google-oauth-disconnect]
+verify_jwt = false
+
+[functions.google-oauth-start]
+verify_jwt = false
+
+[functions.list-medical-derived-status]
+verify_jwt = false
+
+[functions.migrate-legacy-clinical-fields]
+verify_jwt = false
+
+[functions.public-schedule]
+verify_jwt = false
+
+[functions.rotate-medical-encryption-key]
+verify_jwt = false
+
 [functions.send-agenda-push]
 verify_jwt = false
 
 [functions.send-agenda-email]
+verify_jwt = false
+
+[functions.update-medical-entry]
+verify_jwt = false
+
+[functions.upload-medical-attachment-url]
 verify_jwt = false
 
 # [edge_runtime.secrets]

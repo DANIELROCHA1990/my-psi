@@ -117,7 +117,7 @@ function SessionEditModal({
     session_type: session.session_type || 'Sessao Individual',
     session_price: session.session_price?.toString() || '',
     payment_status: session.payment_status || 'pending',
-    summary: session.summary || ''
+    summary: session.operational_summary || ''
   })
   const [saving, setSaving] = useState(false)
   const [conflictInfo, setConflictInfo] = useState<{
@@ -169,7 +169,7 @@ function SessionEditModal({
         session_type: formData.session_type || undefined,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         payment_status: formData.payment_status || 'pending',
-        summary: formData.summary || undefined
+        operational_summary: formData.summary || undefined
       }
 
       const updatedSession = await sessionService.updateSession(session.id, updates)
@@ -296,14 +296,14 @@ function SessionEditModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Resumo
+              Resumo operacional (não sensível)
             </label>
             <textarea
               rows={3}
               value={formData.summary}
               onChange={(event) => setFormData(prev => ({ ...prev, summary: event.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              placeholder="Resumo da sessão"
+              placeholder="Ex: sessão confirmada e sem intercorrências operacionais."
             />
           </div>
 

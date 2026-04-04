@@ -4,7 +4,7 @@ import { patientService } from '../services/patientService'
 import { sessionService } from '../services/sessionService'
 import { financialService } from '../services/financialService'
 import { supabase } from '../lib/supabase'
-import { Patient, Session, FinancialRecord } from '../types'
+import { Session, FinancialRecord } from '../types'
 import { 
   Users, 
   Calendar, 
@@ -27,7 +27,9 @@ export default function Dashboard() {
     upcomingSessions: 0,
     weeklyRevenue: 0,
     monthlyRevenue: 0,
-    receivableAmount: 0
+    receivableAmount: 0,
+    clinicalRecords: 0,
+    pendingEvolutions: 0
   })
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([])
   const [recentTransactions, setRecentTransactions] = useState<FinancialRecord[]>([])
@@ -61,13 +63,26 @@ export default function Dashboard() {
         .filter(session => session.payment_status === 'pending')
         .reduce((sum, session) => sum + Number(session.session_price || 0), 0)
 
+      const { data: clinicalStatus, error: clinicalError } = await supabase
+        .from('patient_clinical_status')
+        .select('has_record,has_pending_evolution')
+
+      if (clinicalError) {
+        console.error('Error fetching clinical status:', clinicalError)
+      }
+
+      const clinicalRecords = (clinicalStatus || []).filter((row) => row.has_record).length
+      const pendingEvolutions = (clinicalStatus || []).filter((row) => row.has_pending_evolution).length
+
       setStats({
         totalPatients: patients.length,
         activePatients: activePatients.length,
         upcomingSessions: upcomingSessions.length,
         weeklyRevenue,
         monthlyRevenue,
-        receivableAmount
+        receivableAmount,
+        clinicalRecords,
+        pendingEvolutions
       })
       
       setUpcomingSessions(upcomingSessions)
@@ -267,6 +282,30 @@ export default function Dashboard() {
               <p className="text-xl font-bold text-gray-900 whitespace-nowrap">
                 R$ {stats.receivableAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-50 p-2 rounded-lg">
+              <FileText className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-600">Prontuários Ativos</p>
+              <p className="text-xl font-bold text-gray-900">{stats.clinicalRecords}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="bg-orange-50 p-2 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-600">Evoluções Pendentes</p>
+              <p className="text-xl font-bold text-gray-900">{stats.pendingEvolutions}</p>
             </div>
           </div>
         </div>

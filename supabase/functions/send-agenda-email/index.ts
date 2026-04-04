@@ -1,7 +1,8 @@
 /// <reference path="../deno.d.ts" />
 import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import nodemailer from 'npm:nodemailer@6.9.8'
+import { getBearerToken, requireAuth } from '../_shared/auth.ts'
+import { getAuthClient } from '../_shared/supabase.ts'
 
 declare const Deno: {
   env: {
@@ -281,21 +282,9 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? ''
-    console.log('send-agenda-email headers keys:', [...req.headers.keys()])
-    console.log('send-agenda-email authHeader present?', Boolean(authHeader))
-    console.log('send-agenda-email authHeader len:', authHeader.length)
-    console.log('send-agenda-email authHeader prefix:', authHeader.slice(0, 20))
-
     const body = await req.json()
     const date = typeof body?.date === 'string' ? body.date.trim() : ''
-    const bodyToken = typeof body?.accessToken === 'string' ? body.accessToken.trim() : ''
-    const token = authHeader
-      ? authHeader.replace(/^Bearer\s+/i, '').trim()
-      : bodyToken
-
-    console.log('send-agenda-email token len:', token.length)
-    console.log('send-agenda-email token prefix:', token.slice(0, 12))
+    const token = getBearerToken(req)
     if (!token) {
       return new Response(JSON.stringify({ ok: false, error: 'Missing auth token' }), {
         status: 401,
@@ -309,29 +298,15 @@ serve(async (req) => {
       })
     }
 
-    const supabaseUrl = Deno.env.get('VITE_SUPABASE_URL') ?? ''
-    const anonKey = Deno.env.get('VITE_SUPABASE_ANON_KEY') ?? ''
-
-    console.log('send-agenda-email supabaseUrl:', supabaseUrl)
-    console.log('send-agenda-email anonKey len:', anonKey.length)
-
-    if (!supabaseUrl || !anonKey) {
-      return new Response(JSON.stringify({ ok: false, error: 'Supabase anon secrets not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
-    })
-    const { data: userData, error: userError } = await authClient.auth.getUser()
-    if (userError || !userData?.user) {
+    const auth = await requireAuth(token).catch(() => null)
+    if (!auth?.userId) {
       return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+    const authClient = getAuthClient(auth.token)
+
     const decodedPayload = decodeJwtPayload(token)
     const tokenEmail =
       typeof decodedPayload?.email === 'string'

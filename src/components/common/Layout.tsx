@@ -10,6 +10,7 @@ import {
   CalendarClock,
   CalendarCheck2,
   Wallet,
+  FileText,
   SlidersHorizontal,
   LogOut,
   Menu,
@@ -91,6 +92,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Sessões', href: '/sessions', icon: CalendarCheck2 },
     { name: 'Agenda', href: '/calendar', icon: CalendarClock },
     { name: 'Financeiro', href: '/financial', icon: Wallet },
+    { name: 'Prontuário', href: '/medical-records', icon: FileText },
     { name: 'Configurações', href: '/settings', icon: SlidersHorizontal }
   ]
 

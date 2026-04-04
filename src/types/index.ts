@@ -78,6 +78,11 @@ export interface Session {
   mood_before?: string
   mood_after?: string
   homework_assigned?: string
+  operational_summary?: string
+  has_clinical_entry?: boolean
+  requires_clinical_evolution?: boolean
+  clinical_last_updated_at?: string
+  clinical_entry_id?: string
   next_session_date?: string
   session_price?: number
   payment_status?: string

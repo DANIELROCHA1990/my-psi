@@ -13,14 +13,17 @@ created_folders as (
   from users_without_folder
   returning id, user_id
 ),
-fallback_folders as (
-  select id, user_id from created_folders
-  union all
+existing_folders as (
   select distinct on (df.user_id) df.id, df.user_id
   from public.document_folders df
   join public.document_templates dt on dt.user_id = df.user_id
   where dt.folder_id is null
   order by df.user_id, df.created_at asc
+),
+fallback_folders as (
+  select id, user_id from created_folders
+  union all
+  select id, user_id from existing_folders
 )
 update public.document_templates dt
 set folder_id = ff.id

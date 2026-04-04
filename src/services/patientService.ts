@@ -1,11 +1,47 @@
-﻿import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { Patient } from '../types'
+
+const PATIENT_SAFE_COLUMNS = `
+  id,
+  user_id,
+  full_name,
+  email,
+  phone,
+  address,
+  created_at,
+  birth_date,
+  cpf,
+  city,
+  state,
+  zip_code,
+  emergency_contact,
+  emergency_phone,
+  session_frequency,
+  session_price,
+  session_link,
+  meet_event_id,
+  meet_calendar_id,
+  calendar_color,
+  auto_renew_sessions,
+  session_schedules,
+  active,
+  is_temp,
+  updated_at
+`
+
+const stripLegacyClinicalFields = <T extends Record<string, unknown>>(value: T): T => {
+  const sanitized = { ...value }
+  delete (sanitized as Record<string, unknown>).medical_history
+  delete (sanitized as Record<string, unknown>).current_medications
+  delete (sanitized as Record<string, unknown>).therapy_goals
+  return sanitized as T
+}
 
 export const patientService = {
   async getPatients(): Promise<Patient[]> {
     const { data, error } = await supabase
       .from('patients')
-      .select('*')
+      .select(PATIENT_SAFE_COLUMNS)
       .order('full_name', { ascending: true })
 
     if (error) {
@@ -19,7 +55,7 @@ export const patientService = {
   async getPatient(id: string): Promise<Patient | null> {
     const { data, error } = await supabase
       .from('patients')
-      .select('*')
+      .select(PATIENT_SAFE_COLUMNS)
       .eq('id', id)
       .single()
 
@@ -32,14 +68,13 @@ export const patientService = {
   },
 
   async createPatient(patient: Omit<Patient, 'id' | 'created_at' | 'updated_at'>) {
-    // Remove user_id from the data since it will be set by the trigger  
-    const { user_id, ...patientData } = patient as any
-    
-    console.log('Creating patient with data:', patientData)
+    const { user_id, ...patientDataRaw } = patient as any
+    const patientData = stripLegacyClinicalFields(patientDataRaw)
+
     const { data, error } = await supabase
       .from('patients')
       .insert([patientData])
-      .select()
+      .select(PATIENT_SAFE_COLUMNS)
       .single()
 
     if (error) {
@@ -53,14 +88,14 @@ export const patientService = {
   },
 
   async updatePatient(id: string, updates: Partial<Patient>) {
-    // Remove readonly fields
-    const { id: patientId, created_at, updated_at, ...updateData } = updates
-    
+    const { id: patientId, created_at, updated_at, ...updateDataRaw } = updates
+    const updateData = stripLegacyClinicalFields(updateDataRaw)
+
     const { data, error } = await supabase
       .from('patients')
       .update(updateData)
       .eq('id', id)
-      .select()
+      .select(PATIENT_SAFE_COLUMNS)
       .single()
 
     if (error) {

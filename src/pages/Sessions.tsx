@@ -678,6 +678,16 @@ function MonthSessionsModal({
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
                               {statusLabels[sessionStatus]}
                             </span>
+                            {session.requires_clinical_evolution ? (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                Evolução pendente
+                              </span>
+                            ) : null}
+                            {session.has_clinical_entry ? (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                                Com prontuário
+                              </span>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => onEditSession(session)}
@@ -798,14 +808,10 @@ function SessionModal({
     patient_id: session?.patient_id || '',
     session_date: session?.session_date ? format(parseISO(session.session_date), "yyyy-MM-dd'T'HH:mm") : '',
     session_type: session?.session_type || 'Sessao Individual',
-    session_notes: session?.session_notes || '',
-    mood_before: session?.mood_before || '',
-    mood_after: session?.mood_after || '',
-    homework_assigned: session?.homework_assigned || '',
     next_session_date: session?.next_session_date ? format(parseISO(session.next_session_date), "yyyy-MM-dd'T'HH:mm") : '',
     session_price: session?.session_price?.toString() || selectedPatient?.session_price?.toString() || '',
     payment_status: session?.payment_status || 'pending',
-    summary: session?.summary || ''
+    summary: session?.operational_summary || ''
   })
   const [loading, setLoading] = useState(false)
   const [conflictInfo, setConflictInfo] = useState<{
@@ -862,14 +868,10 @@ function SessionModal({
         session_date: formData.session_date,
         duration_minutes: DEFAULT_SESSION_DURATION_MINUTES,
         session_type: formData.session_type || undefined,
-        session_notes: formData.session_notes || undefined,
-        mood_before: formData.mood_before || undefined,
-        mood_after: formData.mood_after || undefined,
-        homework_assigned: formData.homework_assigned || undefined,
         next_session_date: formData.next_session_date || undefined,
         session_price: formData.session_price ? Number(formData.session_price) : undefined,
         payment_status: formData.payment_status || 'pending',
-        summary: formData.summary || undefined
+        operational_summary: formData.summary || undefined
       }
 
       if (session) {
@@ -999,75 +1001,24 @@ function SessionModal({
           
           {/* Session Details */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Detalhes da Sessão</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Detalhes Operacionais</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Resumo da Sessão
+                  Resumo Operacional (não sensível)
                 </label>
                 <textarea
                   rows={4}
                   value={formData.summary}
                   onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Resumo dos principais pontos abordados na sessão..."
+                  placeholder="Ex: sessão realizada, sem intercorrências operacionais."
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Conteúdo clínico sensível deve ser registrado exclusivamente em Prontuário.
+                </p>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Anotações da Sessão
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.session_notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, session_notes: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Observacoes e anotacoes importantes..."
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Humor Antes da Sessão
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.mood_before}
-                    onChange={(e) => setFormData(prev => ({ ...prev, mood_before: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Ex: Ansioso, Calmo, Irritado..."
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Humor Após a Sessão
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.mood_after}
-                    onChange={(e) => setFormData(prev => ({ ...prev, mood_after: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Ex: Mais calmo, Reflexivo, Motivado..."
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tarefa/Exercicio Atribuido
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.homework_assigned}
-                  onChange={(e) => setFormData(prev => ({ ...prev, homework_assigned: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Exercícios ou tarefas para realizar até a próxima sessão..."
-                />
-              </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Próxima Sessão

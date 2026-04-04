@@ -154,25 +154,81 @@ const syncPatientMeetWithNextUpcomingSession = async (patientId: string) => {
 
 const isMeetLink = (value?: string | null) => Boolean(value && value.includes('meet.google.com/'))
 
+const SESSION_BASE_FIELDS = `
+  id,
+  patient_id,
+  session_date,
+  created_at,
+  user_id,
+  duration_minutes,
+  session_type,
+  next_session_date,
+  session_price,
+  payment_status,
+  updated_at,
+  operational_summary,
+  has_clinical_entry,
+  requires_clinical_evolution,
+  clinical_last_updated_at,
+  clinical_entry_id
+`
+
+const SESSION_WITH_PATIENT_COLUMNS = `
+  ${SESSION_BASE_FIELDS},
+  patients (
+    id,
+    full_name,
+    email,
+    phone,
+    session_link,
+    calendar_color,
+    active,
+    session_frequency,
+    session_price,
+    auto_renew_sessions,
+    session_schedules
+  )
+`
+
+const SESSION_WITH_PATIENT_DETAIL_COLUMNS = `
+  ${SESSION_BASE_FIELDS},
+  patients (
+    id,
+    full_name,
+    email,
+    phone,
+    birth_date,
+    cpf,
+    address,
+    city,
+    state,
+    zip_code,
+    session_link,
+    calendar_color,
+    emergency_contact,
+    emergency_phone,
+    session_frequency,
+    session_price,
+    active
+  )
+`
+
+const SESSION_WITH_MIN_PATIENT_COLUMNS = `
+  ${SESSION_BASE_FIELDS},
+  patients (
+    id,
+    full_name,
+    email,
+    phone,
+    session_link,
+    calendar_color
+  )
+`
+
 const fetchSessions = async (): Promise<Session[]> => {
   const { data, error } = await supabase
     .from('sessions')
-    .select(`
-      *,
-      patients (
-        id,
-        full_name,
-        email,
-        phone,
-        session_link,
-        calendar_color,
-        active,
-        session_frequency,
-        session_price,
-        auto_renew_sessions,
-        session_schedules
-      )
-    `)
+    .select(SESSION_WITH_PATIENT_COLUMNS)
     .order('session_date', { ascending: false })
 
   if (error) {
@@ -293,22 +349,7 @@ export const sessionService = {
     
     const { data, error } = await supabase
       .from('sessions')
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          session_link,
-          calendar_color,
-          active,
-          session_frequency,
-          session_price,
-          auto_renew_sessions,
-          session_schedules
-        )
-      `)
+      .select(SESSION_WITH_PATIENT_COLUMNS)
       .gte('session_date', now) // Compara com a string ISO UTC
       .order('session_date', { ascending: true })
 
@@ -329,31 +370,7 @@ export const sessionService = {
   async getSession(id: string): Promise<Session | null> {
     const { data, error } = await supabase
       .from('sessions')
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          birth_date,
-          cpf,
-          address,
-          city,
-          state,
-          zip_code,
-          session_link,
-          calendar_color,
-          emergency_contact,
-          emergency_phone,
-          medical_history,
-          current_medications,
-          therapy_goals,
-          session_frequency,
-          session_price,
-          active
-        )
-      `)
+      .select(SESSION_WITH_PATIENT_DETAIL_COLUMNS)
       .eq('id', id)
       .single()
 
@@ -387,17 +404,7 @@ export const sessionService = {
     const { data, error } = await supabase
       .from('sessions')
       .insert([sessionData])
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          session_link,
-          calendar_color
-        )
-      `)
+      .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
       .single()
 
     if (error) {
@@ -435,17 +442,7 @@ export const sessionService = {
       .from('sessions')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          session_link,
-          calendar_color
-        )
-      `)
+      .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
       .single()
 
     if (error) {
@@ -453,6 +450,33 @@ export const sessionService = {
     }
 
     let updatedSession = data
+
+    if (updates.payment_status === 'paid') {
+      const { data: pendingEvolutionSession } = await supabase
+        .from('sessions')
+        .update({ requires_clinical_evolution: true })
+        .eq('id', id)
+        .eq('user_id', updatedSession.user_id)
+        .eq('has_clinical_entry', false)
+        .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
+        .maybeSingle()
+
+      if (pendingEvolutionSession) {
+        updatedSession = pendingEvolutionSession
+      }
+    } else if (updates.payment_status === 'cancelled') {
+      const { data: cancelledSession } = await supabase
+        .from('sessions')
+        .update({ requires_clinical_evolution: false })
+        .eq('id', id)
+        .eq('user_id', updatedSession.user_id)
+        .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
+        .maybeSingle()
+
+      if (cancelledSession) {
+        updatedSession = cancelledSession
+      }
+    }
 
     if (updates.payment_status === 'cancelled') {
       const sessionDate = parseISO(updatedSession.session_date)
@@ -462,17 +486,7 @@ export const sessionService = {
             .from('sessions')
             .update({ session_price: null })
             .eq('id', id)
-            .select(`
-              *,
-              patients (
-                id,
-                full_name,
-                email,
-                phone,
-                session_link,
-                calendar_color
-              )
-            `)
+            .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
             .single()
 
           if (clearError) {
@@ -606,11 +620,11 @@ export const sessionService = {
           session_type: schedule.sessionType || 'Sessao Individual',
           session_price: schedule.sessionPrice ?? (patient?.session_price || null),
           payment_status: schedule.paymentStatus || 'pending',
-          summary: null,
-          session_notes: null,
-          mood_before: null,
-          mood_after: null,
-          homework_assigned: null,
+          operational_summary: null,
+          has_clinical_entry: false,
+          requires_clinical_evolution: false,
+          clinical_last_updated_at: null,
+          clinical_entry_id: null,
           next_session_date: null
         })
       }
@@ -656,17 +670,7 @@ export const sessionService = {
     const { data, error } = await supabase
       .from('sessions')
       .insert(sessions)
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          session_link,
-          calendar_color
-        )
-      `)
+      .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
     
     if (error) {
       throw new Error(`Failed to create multiple sessions: ${error.message}`)
@@ -689,27 +693,46 @@ export const sessionService = {
       return []
     }
 
+    const statusUpdatePayload: Record<string, unknown> = { payment_status: paymentStatus }
+
     const { data, error } = await supabase
       .from('sessions')
-      .update({ payment_status: paymentStatus })
+      .update(statusUpdatePayload)
       .in('id', sessionIds)
-      .select(`
-        *,
-        patients (
-          id,
-          full_name,
-          email,
-          phone,
-          session_link,
-          calendar_color
-        )
-      `)
+      .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
 
     if (error) {
       throw new Error(`Failed to update sessions status: ${error.message}`)
     }
 
     let updatedSessions = data || []
+
+    if (paymentStatus === 'paid') {
+      const { data: pendingSessions } = await supabase
+        .from('sessions')
+        .update({ requires_clinical_evolution: true })
+        .in('id', sessionIds)
+        .eq('has_clinical_entry', false)
+        .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
+
+      if (pendingSessions?.length) {
+        const sessionMap = new Map(updatedSessions.map((session) => [session.id, session]))
+        pendingSessions.forEach((session) => sessionMap.set(session.id, session))
+        updatedSessions = Array.from(sessionMap.values())
+      }
+    } else if (paymentStatus === 'cancelled') {
+      const { data: cancelledSessions } = await supabase
+        .from('sessions')
+        .update({ requires_clinical_evolution: false })
+        .in('id', sessionIds)
+        .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
+
+      if (cancelledSessions?.length) {
+        const sessionMap = new Map(updatedSessions.map((session) => [session.id, session]))
+        cancelledSessions.forEach((session) => sessionMap.set(session.id, session))
+        updatedSessions = Array.from(sessionMap.values())
+      }
+    }
 
     if (paymentStatus === 'cancelled') {
       const now = new Date()
@@ -724,17 +747,7 @@ export const sessionService = {
           .from('sessions')
           .update({ session_price: null })
           .in('id', futureIds)
-          .select(`
-            *,
-            patients (
-              id,
-              full_name,
-              email,
-              phone,
-              session_link,
-              calendar_color
-            )
-          `)
+          .select(SESSION_WITH_MIN_PATIENT_COLUMNS)
 
         if (clearError) {
           console.error('Error clearing session price for cancelled sessions:', clearError)

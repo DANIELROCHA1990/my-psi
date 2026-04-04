@@ -1,8 +1,9 @@
-﻿/// <reference path="../deno.d.ts" />
+/// <reference path="../deno.d.ts" />
 import { serve } from 'https://deno.land/std@0.203.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import { cert, getApps, initializeApp } from 'npm:firebase-admin/app'
 import { getMessaging } from 'npm:firebase-admin/messaging'
+import { getBearerToken, requireAuth } from '../_shared/auth.ts'
+import { getAuthClient } from '../_shared/supabase.ts'
 
 declare const Deno: {
   env: {
@@ -69,14 +70,14 @@ const formatTimeWithOffset = (isoString: string, offsetMinutes: number) => {
 const buildBody = (times: string[]) => {
   const cleaned = Array.from(new Set(times.filter(Boolean))).sort()
   if (!cleaned.length) {
-    return 'Sua sessão hoje tem horário a confirmar.'
+    return 'Sua sess�o hoje tem hor�rio a confirmar.'
   }
   if (cleaned.length === 1) {
-    return `Sua sessão será hoje às ${cleaned[0]}.`
+    return `Sua sess�o ser� hoje �s ${cleaned[0]}.`
   }
   const last = cleaned[cleaned.length - 1]
   const initial = cleaned.slice(0, -1)
-  return `Suas sessões serão hoje às ${initial.join(', ')} e ${last}.`
+  return `Suas sess�es ser�o hoje �s ${initial.join(', ')} e ${last}.`
 }
 
 const initializeFirebase = () => {
@@ -117,13 +118,9 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? ''
     const body = await req.json().catch(() => ({}))
     const date = typeof body?.date === 'string' ? body.date.trim() : ''
-    const bodyToken = typeof body?.accessToken === 'string' ? body.accessToken.trim() : ''
-    const token = authHeader
-      ? authHeader.replace(/^Bearer\s+/i, '').trim()
-      : bodyToken
+    const token = getBearerToken(req)
     const dryRun = Boolean(body?.dryRun)
 
     if (!token) {
@@ -140,27 +137,14 @@ serve(async (req) => {
       })
     }
 
-    const supabaseUrl = Deno.env.get('VITE_SUPABASE_URL') ?? ''
-    const anonKey = Deno.env.get('VITE_SUPABASE_ANON_KEY') ?? ''
-
-    if (!supabaseUrl || !anonKey) {
-      return new Response(JSON.stringify({ ok: false, error: 'Supabase anon secrets not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
-    })
-
-    const { data: userData, error: userError } = await authClient.auth.getUser()
-    if (userError || !userData?.user) {
+    const auth = await requireAuth(token).catch(() => null)
+    if (!auth?.userId) {
       return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+    const authClient = getAuthClient(auth.token)
 
     const timezone = Deno.env.get('APP_TIMEZONE') ?? '-03:00'
     const dateRange = getDateRangeIso(date, timezone)
@@ -357,7 +341,7 @@ serve(async (req) => {
       const routePath = route.pathname + route.search
       const dataPayload = {
         route: routePath,
-        title: 'Lembrete de sessão',
+        title: 'Lembrete de sess�o',
         body: bodyMessage,
         date,
         time: primaryTime,
@@ -373,7 +357,7 @@ serve(async (req) => {
       const message = {
         tokens,
         notification: {
-          title: 'Lembrete de sessão',
+          title: 'Lembrete de sess�o',
           body: bodyMessage
         },
         webpush: {

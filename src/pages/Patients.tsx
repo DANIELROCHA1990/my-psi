@@ -25,10 +25,17 @@ export default function Patients() {
   const [approvalMode, setApprovalMode] = useState(false)
   const [rejectingPatient, setRejectingPatient] = useState<Patient | null>(null)
   const [rejectingLoading, setRejectingLoading] = useState(false)
+  const [clinicalStatusByPatient, setClinicalStatusByPatient] = useState<Record<string, {
+    hasRecord: boolean
+    hasPendingEvolution: boolean
+    hasPendingDocument: boolean
+    alertLevel: number
+  }>>({})
 
   useEffect(() => {
     loadPatients()
     loadProfile()
+    loadClinicalStatus()
   }, [])
 
   const loadPatients = async () => {
@@ -36,6 +43,7 @@ export default function Patients() {
       setLoading(true)
       const data = await patientService.getPatients()
       setPatients(data)
+      await loadClinicalStatus()
     } catch (error) {
       toast.error('Erro ao carregar pacientes')
     } finally {
@@ -46,6 +54,32 @@ export default function Patients() {
   const loadProfile = async () => {
     const data = await profileService.getProfile()
     setProfile(data)
+  }
+
+  const loadClinicalStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('patient_clinical_status')
+        .select('patient_id,has_record,has_pending_evolution,has_pending_document,alert_level')
+
+      if (error) {
+        console.error('Erro ao carregar status clínico:', error)
+        return
+      }
+
+      const next: Record<string, { hasRecord: boolean; hasPendingEvolution: boolean; hasPendingDocument: boolean; alertLevel: number }> = {}
+      ;(data || []).forEach((row: any) => {
+        next[row.patient_id] = {
+          hasRecord: Boolean(row.has_record),
+          hasPendingEvolution: Boolean(row.has_pending_evolution),
+          hasPendingDocument: Boolean(row.has_pending_document),
+          alertLevel: Number(row.alert_level || 0)
+        }
+      })
+      setClinicalStatusByPatient(next)
+    } catch (error) {
+      console.error('Erro ao carregar status clínico:', error)
+    }
   }
 
   const handleDeactivate = async (patient: Patient) => {
@@ -642,6 +676,25 @@ export default function Patients() {
                           Cadastrado em {format(new Date(patient.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                         </p>
                       )}
+                      {clinicalStatusByPatient[patient.id] && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {clinicalStatusByPatient[patient.id].hasRecord ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                              Prontuário ativo
+                            </span>
+                          ) : null}
+                          {clinicalStatusByPatient[patient.id].hasPendingEvolution ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                              Evolução pendente
+                            </span>
+                          ) : null}
+                          {clinicalStatusByPatient[patient.id].hasPendingDocument ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              Documento pendente
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -755,6 +808,7 @@ export default function Patients() {
           }}
           onSave={() => {
             loadPatients()
+            loadClinicalStatus()
             setShowAddForm(false)
             setEditingPatient(null)
             setReactivateMode(false)
@@ -839,9 +893,6 @@ function PatientModal({
     zip_code: patient?.zip_code || '',
     emergency_contact: patient?.emergency_contact || '',
     emergency_phone: patient?.emergency_phone || '',
-    medical_history: patient?.medical_history || '',
-    current_medications: patient?.current_medications || '',
-    therapy_goals: patient?.therapy_goals || '',
     session_frequency: patient?.session_frequency || 'weekly',
     session_price: patient?.session_price?.toString() || '',
     session_link: patient?.session_link || '',
@@ -1354,10 +1405,7 @@ function PatientModal({
         state: formData.state || undefined,
         zip_code: formData.zip_code || undefined,
         emergency_contact: formData.emergency_contact || undefined,
-        emergency_phone: formData.emergency_phone || undefined,
-        medical_history: formData.medical_history || undefined,
-        current_medications: formData.current_medications || undefined,
-        therapy_goals: formData.therapy_goals || undefined
+        emergency_phone: formData.emergency_phone || undefined
       }
 
       if (isApproval) {
@@ -1700,49 +1748,10 @@ function PatientModal({
             </div>
           </div>
           
-          {/* Clinical Information */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Informações Clínicas</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Histórico Médico
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.medical_history}
-                  onChange={(e) => setFormData(prev => ({ ...prev, medical_history: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Histórico médico relevante..."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Medicações Atuais
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.current_medications}
-                  onChange={(e) => setFormData(prev => ({ ...prev, current_medications: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Medicações em uso..."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Objetivos da Terapia
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.therapy_goals}
-                  onChange={(e) => setFormData(prev => ({ ...prev, therapy_goals: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Objetivos e metas da terapia..."
-                />
-              </div>
-            </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-800">
+              Dados clínicos sensíveis foram movidos para o módulo Prontuário.
+            </p>
           </div>
           
           {/* Session Settings */}
