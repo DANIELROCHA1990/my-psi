@@ -395,6 +395,9 @@ verify_jwt = false
 [functions.list-medical-derived-status]
 verify_jwt = false
 
+[functions.keep-alive]
+verify_jwt = false
+
 [functions.migrate-legacy-clinical-fields]
 verify_jwt = false
 
