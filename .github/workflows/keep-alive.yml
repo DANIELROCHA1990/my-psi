@@ -12,4 +12,10 @@ jobs:
       - name: Send keep-alive request
         env:
           KEEP_ALIVE_URL: ${{ secrets.KEEP_ALIVE_URL }}
-        run: curl --fail --silent --show-error --max-time 30 "$KEEP_ALIVE_URL"
+        run: |
+          if [[ -z "$KEEP_ALIVE_URL" || ! "$KEEP_ALIVE_URL" =~ ^https://[^[:space:]]+$ ]]; then
+            echo "KEEP_ALIVE_URL is missing or invalid. Set it to the HTTPS Supabase keep-alive function URL in repository Actions secrets."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --max-time 30 "$KEEP_ALIVE_URL"
